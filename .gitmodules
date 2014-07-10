@@ -1,0 +1,15 @@
+[submodule "libraries/glfw"]
+	path = libraries/glfw
+	url = git@github.com:jherico/glfw.git
+[submodule "libraries/oglplus"]
+	path = libraries/oglplus
+	url = git@github.com:matus-chochlik/oglplus.git
+[submodule "libraries/OculusSDK"]
+	path = libraries/OculusSDK
+	url = git@github.com:jherico/OculusSDK.git
+[submodule "libraries/chess"]
+	path = libraries/chess
+	url = git@github.com:jherico/libagchess.git
+[submodule "libraries/glm"]
+	path = libraries/glm
+	url = git@github.com:g-truc/glm.git
