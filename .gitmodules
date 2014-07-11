@@ -3,7 +3,7 @@
 	url = git@github.com:jherico/glfw.git
 [submodule "libraries/oglplus"]
 	path = libraries/oglplus
-	url = git@github.com:matus-chochlik/oglplus.git
+	url = git@github.com:jherico/oglplus.git
 [submodule "libraries/OculusSDK"]
 	path = libraries/OculusSDK
 	url = git@github.com:jherico/OculusSDK.git
