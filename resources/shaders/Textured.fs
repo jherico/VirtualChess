@@ -1,4 +1,4 @@
-#version 330
+#version 440
 
 uniform sampler2D sampler;
 uniform float Alpha = 1.0;

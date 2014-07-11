@@ -1,4 +1,4 @@
-#version 330
+#version 440
 
 uniform vec4 Ambient;
 uniform vec4 LightPosition[8];

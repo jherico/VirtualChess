@@ -1,4 +1,5 @@
 #version 440
+
 layout(location = 0) uniform vec2 EyeToSourceUVScale = vec2(1);
 layout(location = 1) uniform vec2 EyeToSourceUVOffset = vec2(0);
 uniform sampler2D Texture0;

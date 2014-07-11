@@ -1,7 +1,7 @@
-#version 330
+#version 440
 
-uniform mat4 Projection = mat4(1);
-uniform mat4 ModelView = mat4(1);
+layout (location = 0) uniform mat4 Projection = mat4(1);
+layout (location = 1) uniform mat4 ModelView = mat4(1);
 
 layout(location = 0) in vec3 Position;
 
