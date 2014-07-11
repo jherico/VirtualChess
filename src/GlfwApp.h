@@ -31,6 +31,7 @@ protected:
   float        windowAspect;
   float        windowAspectInverse;
   float        fps;
+  oglplus::Context gl;
 
 public:
   GlfwApp();
@@ -51,15 +52,11 @@ public:
   virtual void onKey(int key, int scancode, int action, int mods);
   virtual void draw();
   virtual void update();
-  virtual void renderStringAt(const std::string & string, float x, float y) {
-    renderStringAt(string, vec2(x, y));
-  }
-  virtual void renderStringAt(const std::string & string, const vec2 & position);
 
   static GLFWmonitor * getMonitorAtPosition(const ivec2 & position);
   void createSecondaryScreenWindow(const uvec2 & size);
 
-private:
+protected:
   void onCreate();
   void preCreate();
 };

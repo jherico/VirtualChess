@@ -81,8 +81,10 @@ list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 # Oculus VR SDK dependency 
 #
 
-add_subdirectory(libraries/OculusSDK/3rdParty/EDID)
-set_target_properties(edid PROPERTIES FOLDER "3rdparty")
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") 
+  add_subdirectory(libraries/OculusSDK/3rdParty/EDID)
+  set_target_properties(edid PROPERTIES FOLDER "3rdparty")
+endif()
 
 add_subdirectory(libraries/OculusSDK/LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
@@ -119,6 +121,7 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 # OpenGL object wrappers  
 #
 include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
 
 
 ###############################################################################

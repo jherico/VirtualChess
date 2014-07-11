@@ -34,6 +34,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdarg>
+#include <cstdio>
 
 #include <algorithm>
 #include <array>
@@ -69,6 +70,13 @@ using glm::quat;
 
 #include <GL/glew.h>
 
+#include <oglplus/all.hpp>
+#include <oglplus/interop/glm.hpp>
+#include <oglplus/bound/texture.hpp>
+#include <oglplus/bound/framebuffer.hpp>
+#include <oglplus/bound/renderbuffer.hpp>
+#include <oglplus/bound/buffer.hpp>
+
 #include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
 
@@ -99,7 +107,8 @@ public:
     static void fail(const char * file, int line, const char * message, ...);
     static void say(std::ostream & out, const char * message, ...);
     static std::string format(const char * formatString, ...);
-    static std::string getResourceData(Resource resource);
+    static std::string getResourceString(Resource resource);
+    static std::vector<uint8_t> getResourceVector(Resource resource);
     static std::string replaceAll(const std::string & in, const std::string & from, const std::string & to);
 };
 
@@ -148,7 +157,15 @@ public:
         return -1; \
     }
 
+template <typename T>
+inline float aspect(T const & size) {
+  return (float)size.x / (float)size.y;
+}
+
 #include "Config.h"
+#include "GlDebug.h"
+#include "GlStacks.h"
+#include "GlUtils.h"
 #include "Files.h"
 #include "GlfwApp.h"
 #include "Interaction.h"

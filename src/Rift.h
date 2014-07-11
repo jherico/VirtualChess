@@ -225,22 +225,30 @@ public:
   }
 };
 
+
 class RiftApp : public RiftGlfwApp {
+
+  struct PerEyeArgs {
+    ovrGLTexture ovrTexture;
+    //ovrEyeRenderDesc ovrEyeDesc;
+    mat4 projection;
+    oglplus::Texture color_tex;
+    oglplus::Renderbuffer depth_rbo;
+    oglplus::Framebuffer fbo;
+    mat4 viewAdjust;
+  };
+
 public:
 
+
 protected:
-  mat4 player;
   ovrPosef  headPose;
-  ovrGLTexture eyeTextures[2];
+  PerEyeArgs * eyesArgs;
 
 private:
-  ovrEyeRenderDesc eyeRenderDescs[2];
-  mat4 projections[2];
-  mat4 orthoProjections[2];
   ovrEyeType currentEye;
 
 protected:
-  void renderStringAt(const std::string & str, float x, float y);
   virtual void initGl();
   virtual void finishFrame();
   virtual void onKey(int key, int scancode, int action, int mods);
@@ -249,43 +257,10 @@ protected:
   virtual void update();
   virtual void renderScene() = 0;
 
-
-
   inline ovrEyeType getCurrentEye() const {
     return currentEye;
   }
 
-  const ovrEyeRenderDesc & getEyeRenderDesc(ovrEyeType eye) const {
-    return eyeRenderDescs[eye];
-  }
-
-  const ovrFovPort & getFov(ovrEyeType eye) const {
-    return eyeRenderDescs[eye].Fov;
-  }
-
-  const mat4 & getPerspectiveProjection(ovrEyeType eye) const {
-    return projections[eye];
-  }
-
-  const mat4 & getOrthographicProjection(ovrEyeType eye) const {
-    return orthoProjections[eye];
-  }
-
-  const ovrFovPort & getFov() const {
-    return getFov(getCurrentEye());
-  }
-
-  const ovrEyeRenderDesc & getEyeRenderDesc() const {
-    return getEyeRenderDesc(getCurrentEye());
-  }
-
-  const mat4 & getPerspectiveProjection() const {
-    return getPerspectiveProjection(getCurrentEye());
-  }
-
-  const mat4 & getOrthographicProjection() const {
-    return getOrthographicProjection(getCurrentEye());
-  }
 
 public:
   RiftApp(bool fullscreen = false);

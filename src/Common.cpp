@@ -17,8 +17,9 @@
 
  ************************************************************************************/
 
+#include <stdio.h>
+#include <stdarg.h>
 #include "Common.h"
-
 #ifdef WIN32
 #include <Windows.h>
 #else
@@ -58,9 +59,9 @@ void Platform::fail(const char * file, int line, const char * message, ...) {
   static char ERROR_BUFFER2[BUFFER_SIZE];
   va_list arg;
   va_start(arg, message);
-  vsnprintf(ERROR_BUFFER1, BUFFER_SIZE, message, arg);
+  vsnprintf_s(ERROR_BUFFER1, BUFFER_SIZE, BUFFER_SIZE, message, arg);
   va_end(arg);
-  snprintf(ERROR_BUFFER2, BUFFER_SIZE, "FATAL %s (%d): %s", file, line,
+  _snprintf_s(ERROR_BUFFER2, BUFFER_SIZE, "FATAL %s (%d): %s", file, line,
       ERROR_BUFFER1);
   std::string error(ERROR_BUFFER2);
   std::cerr << error << std::endl;
@@ -79,7 +80,7 @@ void Platform::say(std::ostream & out, const char * message, ...) {
   static char SAY_BUFFER[BUFFER_SIZE];
   va_list arg;
   va_start(arg, message);
-  vsnprintf(SAY_BUFFER, BUFFER_SIZE, message, arg);
+  vsnprintf_s(SAY_BUFFER, BUFFER_SIZE, BUFFER_SIZE, message, arg);
   va_end(arg);
 #ifdef WIN32
   OutputDebugStringA(SAY_BUFFER);
@@ -88,13 +89,21 @@ void Platform::say(std::ostream & out, const char * message, ...) {
   out << std::string(SAY_BUFFER) << std::endl;
 }
 
-std::string Platform::getResourceData(Resource resource) {
+std::string Platform::getResourceString(Resource resource) {
   size_t size = Resources::getResourceSize(resource);
   char * data = new char[size];
   Resources::getResourceData(resource, data);
   std::string dataStr(data, size);
   delete[] data;
   return dataStr;
+}
+
+std::vector<uint8_t> Platform::getResourceVector(Resource resource) {
+  size_t size = Resources::getResourceSize(resource);
+  std::vector<uint8_t> result;
+  result.resize(size);
+  Resources::getResourceData(resource, &(result[0]));
+  return result;
 }
 
 std::string Platform::format(const char * fmt_str, ...) {
@@ -104,9 +113,9 @@ std::string Platform::format(const char * fmt_str, ...) {
     va_list ap;
     while(1) {
         formatted.reset(new char[n]); /* wrap the plain char array into the unique_ptr */
-        strcpy(&formatted[0], fmt_str);
+        strcpy_s(&formatted[0], n, fmt_str);
         va_start(ap, fmt_str);
-        final_n = vsnprintf(&formatted[0], n, fmt_str, ap);
+        final_n = vsnprintf_s(&formatted[0], n, n, fmt_str, ap);
         va_end(ap);
         if (final_n < 0 || final_n >= n)
             n += abs(final_n - n + 1);

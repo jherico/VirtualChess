@@ -17,11 +17,9 @@
 
  ************************************************************************************/
 #include "Common.h"
-#include "GlfwApp.h"
+
 #include <regex>
-#ifdef HAVE_OPENCV
 #include <opencv2/opencv.hpp>
-#endif
 
 #ifdef __APPLE__
 #include <CoreGraphics/CGDirectDisplay.h>
@@ -90,17 +88,6 @@ GlfwApp::GlfwApp()
   glfwSetErrorCallback(glfwErrorCallback);
 }
 
-void compileAllShaders(const Resource * shaders,
-    GLenum shaderType) {
-  int i = 0;
-  while (shaders[i] != Resource::NO_RESOURCE) {
-    SAY("Compiling %s", Resources::getResourcePath(shaders[i]).c_str());
-    std::string shaderSource = Platform::getResourceData(shaders[i]);
-    gl::Shader s(shaderType, shaderSource);
-    ++i;
-  }
-}
-
 void APIENTRY debugCallback(
     GLenum source,
     GLenum type,
@@ -150,7 +137,7 @@ void APIENTRY debugCallback(
 }
 
 void GlfwApp::onCreate() {
-  windowAspect = glm::aspect(windowSize);
+  windowAspect = aspect(windowSize);
   windowAspectInverse = 1.0f / windowAspect;
   glfwSetWindowUserPointer(window, this);
   glfwSetKeyCallback(window, glfwKeyCallback);
@@ -165,7 +152,7 @@ void GlfwApp::onCreate() {
     FAIL("Failed to initialize GL3W");
   }
   glGetError();
-#ifdef RIFT_DEBUG
+#if 1
   GL_CHECK_ERROR;
   glEnable (GL_DEBUG_OUTPUT_SYNCHRONOUS);
   GL_CHECK_ERROR;
@@ -186,25 +173,6 @@ void GlfwApp::onCreate() {
   }
 #endif
   GL_CHECK_ERROR;
-/*
-  if (glNamedStringARB) {
-    for (int i = 0;
-        Resources::LIB_SHADERS[i] != Resource::NO_SHADER; ++i) {
-
-      std::string shaderFile = getShaderPath(
-          Resources::LIB_SHADERS[i]);
-      std::string shaderSrc = Files::read(shaderFile);
-      size_t lastSlash = shaderFile.rfind('/');
-      std::string name = shaderFile.substr(lastSlash);
-      glNamedStringARB(GL_SHADER_INCLUDE_ARB,
-          name.length(), name.c_str(),
-          shaderSrc.length(), shaderSrc.c_str());
-      GL_CHECK_ERROR;
-    }
-  }
-*/
-  compileAllShaders(Resources::VERTEX_SHADERS, GL_VERTEX_SHADER);
-  compileAllShaders(Resources::FRAGMENT_SHADERS, GL_FRAGMENT_SHADER);
 }
 
 void GlfwApp::preCreate() {
@@ -249,7 +217,6 @@ void GlfwApp::initGl() {
   glCullFace(GL_BACK);
   glDisable(GL_DITHER);
   glEnable(GL_DEPTH_TEST);
-  query = gl::TimeQueryPtr(new gl::TimeQuery());
   GL_CHECK_ERROR;
 }
 
@@ -264,20 +231,6 @@ void GlfwApp::destroyWindow() {
 
 GlfwApp::~GlfwApp() {
   glfwTerminate();
-}
-
-void GlfwApp::renderStringAt(const std::string & str, const vec2 & pos) {
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-  gl::MatrixStack & pr = gl::Stacks::projection();
-  mv.push().identity();
-  pr.push().top() = glm::ortho(
-    -1.0f, 1.0f,
-    -windowAspectInverse, windowAspectInverse,
-    -100.0f, 100.0f);
-  vec2 cursor(pos.x, windowAspectInverse * pos.y);
-  GlUtils::renderString(str, cursor, 18.0f);
-  pr.pop();
-  mv.pop();
 }
 
 void GlfwApp::screenshot() {
