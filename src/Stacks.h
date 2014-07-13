@@ -19,19 +19,8 @@
 
 #pragma once
 
-#ifndef GL_ZERO
-#error "You must include the gl headers before including this file"
-#endif
-
-#include <stack>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-namespace gl {
 
 class MatrixStack : public std::stack<glm::mat4> {
-  const std::string uniformName;
   private:
 
   public:
@@ -40,12 +29,7 @@ class MatrixStack : public std::stack<glm::mat4> {
     push(glm::mat4());
   }
 
-  MatrixStack(const std::string & uniformName)
-      : uniformName(uniformName) {
-    push(glm::mat4());
-  }
-
-  explicit MatrixStack(const MatrixStack & other) : uniformName(other.uniformName) {
+  explicit MatrixStack(const MatrixStack & other) {
     *((std::stack<glm::mat4>*)this) = *((std::stack<glm::mat4>*)&other);
   }
 
@@ -153,22 +137,22 @@ class MatrixStack : public std::stack<glm::mat4> {
 class Stacks {
 public:
   static MatrixStack & projection() {
-    static MatrixStack projection("Projection");
+    static MatrixStack projection;
     return projection;
   }
 
   static MatrixStack & modelview() {
-    static MatrixStack modelview("ModelView");
+    static MatrixStack modelview;
     return modelview;
   }
 
   template <typename Function>
-  static void withPush(gl::MatrixStack & stack, Function f) {
+  static void withPush(MatrixStack & stack, Function f) {
     stack.with_push(f);
   }
 
   template <typename Function>
-  static void withPush(gl::MatrixStack & stack1, gl::MatrixStack & stack2, Function f) {
+  static void withPush(MatrixStack & stack1, MatrixStack & stack2, Function f) {
     stack1.with_push([&]{
       stack2.with_push(f);
     });
@@ -180,12 +164,12 @@ public:
   }
 
   template <typename Function>
-  static void with_push(gl::MatrixStack & stack, Function f) {
+  static void with_push(MatrixStack & stack, Function f) {
     withPush(stack, f);
   }
 
   template <typename Function>
-  static void with_push(gl::MatrixStack & stack1, gl::MatrixStack & stack2, Function f) {
+  static void with_push(MatrixStack & stack1, MatrixStack & stack2, Function f) {
     withPush(stack1, stack2, f);
   }
 
@@ -194,6 +178,4 @@ public:
     withPush(f);
   }
 };
-
-} // gl
 

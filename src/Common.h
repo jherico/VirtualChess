@@ -43,6 +43,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <stack>
 #include <sstream>
 #include <unordered_map>
 
@@ -167,13 +168,13 @@ inline float aspect(T const & size) {
 }
 
 #include "Config.h"
-
+#include "Stacks.h"
 #include "Colors.h"
-#include "GlDebug.h"
-#include "GlStacks.h"
-#include "Mesh.h"
 
+#include "GlDebug.h"
+#include "Mesh.h"
 #include "GlUtils.h"
+#include "RenderUtils.h"
 #include "Files.h"
 #include "Mesh.h"
 #include "SdlWrapperApp.h"

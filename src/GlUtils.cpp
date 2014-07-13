@@ -92,22 +92,16 @@ const vec3 GlUtils::ONE = vec3(1.0f, 1.0f, 1.0f);
 const vec3 GlUtils::UP = vec3(0.0f, 1.0f, 0.0f);
 
 
-Buffer getCubeVertices() {
-  Buffer verts;
-  GlUtils::context().Bound(Buffer::Target::Array, verts).Data(CUBE_VERTICES);
-  return verts;
+void GlUtils::getCubeVertices(Buffer & dest) {
+  GlUtils::context().Bound(Buffer::Target::Array, dest).Data(CUBE_VERTICES);
 }
 
-Buffer getCubeIndices() {
-  Buffer indices;
-  GlUtils::context().Bound(Buffer::Target::ElementArray, indices).Data(CUBE_INDICES);
-  return indices;
+void GlUtils::getCubeIndices(Buffer & dest) {
+  GlUtils::context().Bound(Buffer::Target::ElementArray, dest).Data(CUBE_INDICES);
 }
 
-Buffer getCubeWireIndices() {
-  Buffer indices;
-  GlUtils::context().Bound(Buffer::Target::ElementArray, indices).Data(CUBE_WIRE_INDICES);
-  return indices;
+void GlUtils::getCubeWireIndices(Buffer & dest) {
+  GlUtils::context().Bound(Buffer::Target::ElementArray, dest).Data(CUBE_WIRE_INDICES);
 }
 
 template <class T>
@@ -143,72 +137,6 @@ Program GlUtils::getProgram(Resource vsRes, Resource fsRes) {
   // link and use it
   prog.Link();
   return prog;
-}
-
-void renderGeometry(Program & program, void * geometry) {
-  program.Use();
-  // Uniforms
-  Uniform<mat4>(program, Layout::Uniform::Projection)
-    .Set(gl::Stacks::projection().top());
-  Uniform<mat4>(program, Layout::Uniform::ModelView)
-    .Set(gl::Stacks::modelview().top());
-//  geometry->bindVertexArray();
-//  geometry->draw();
-  NoProgram().Use();
-  //gl::VertexArray::unbind();
-  //gl::Program::clear();
-}
-
-void GlUtils::renderSkybox(Resource firstResource) {
-  GL_CHECK_ERROR;
-  static Program skyboxProgram = getProgram(
-    Resource::SHADERS_CUBEMAP_VS,
-    Resource::SHADERS_CUBEMAP_FS);
-
-  // Skybox texture
-  gl::MatrixStack & mv = gl::Stacks::modelview();
-
-  static Program prog = getProgram(
-      Resource::SHADERS_CUBEMAP_VS, 
-      Resource::SHADERS_CUBEMAP_FS);
-
-  static Buffer cubeVertices = getCubeVertices();
-  static Buffer cubeIndices = getCubeIndices();
-  static VertexArray cubeVao;
-  static bool setup = false;
-  if (!setup) {
-    cubeVao.Bind();
-    VertexArrayAttrib positions(prog, Layout::Attribute::Position);
-    cubeVertices.Bind(Buffer::Target::Array);
-    cubeIndices.Bind(Buffer::Target::ElementArray);
-    positions.Pointer(3, DataType::Float, false, sizeof(vec4), nullptr);
-    positions.Enable();
-    NoVertexArray().Bind();
-    positions.Disable();
-    NoBuffer().Bind(Buffer::Target::Array);
-    NoBuffer().Bind(Buffer::Target::ElementArray);
-    setup = true;
-  }
-
-  Context & gl = context();
-  gl.Disable(Capability::DepthTest);
-  gl.CullFace(Face::Front);
-  prog.Bind();
-  cubeVao.Bind();
-
-  mv.withPush([&]{
-    mv.untranslate();
-    auto boundTexture = gl.Bound(Texture::Target::CubeMap, getCubemapTexture(firstResource));
-    Uniform<mat4>(prog, Layout::Uniform::Projection).Set(gl::Stacks::projection().top());
-    Uniform<mat4>(prog, Layout::Uniform::ModelView).Set(gl::Stacks::modelview().top());
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr);
-    // renderGeometry(GlUtils::getCubeGeometry(), skyboxProgram);
-  });
-
-  NoVertexArray().Bind();
-  NoProgram().Bind();
-  gl.CullFace(Face::Back);
-  gl.Enable(Capability::DepthTest);
 }
 
 images::PNGImage getResourceImage(Resource res) {
@@ -266,7 +194,7 @@ Geometry & GlUtils::getColorCubeGeometry() {
   if (!initialized) {
     Mesh mesh;
     vec3 move(0, 0, 0.5f);
-    gl::MatrixStack & m = mesh.model;
+    MatrixStack & m = mesh.model;
 
     m.push().rotate(glm::angleAxis(PI / 2.0f, Y_AXIS)).translate(move);
     mesh.color = Colors::red;
@@ -303,13 +231,39 @@ Geometry & GlUtils::getColorCubeGeometry() {
   return cube;
 }
 
+const float GlUtils::CHESS_SCALE = 0.055f;
+
+Geometry & GlUtils::getChessBoardGeometry() {
+  static Geometry chess;
+  static bool initialized = false;
+  if (!initialized) {
+    Mesh mesh;
+    vec3 move(0, 0, 0.5f);
+    MatrixStack & m = mesh.model;
+    m.scale(CHESS_SCALE);
+    m.rotate(PI / 2, X_AXIS);
+    m.translate(vec3(-3.5, -3.5, 0));
+    for (int x = 0; x < 8; ++x) {
+      for (int y = 0; y < 8; ++y) {
+        m.withPush([&]{
+          m.translate(vec3(x, y, 0));
+          mesh.color = (x + y) % 2 ? Colors::wheat : Colors::saddleBrown;
+          mesh.addQuad(vec2(1.0));
+          mesh.fillColors(true);
+        });
+      }
+    }
+    chess.loadMesh(mesh);
+  }
+  return chess;
+}
 #if 0
 #define EPSILON 0.002
 void GlUtils::renderArtificialHorizon(float alpha) {
   static gl::GeometryPtr geometry;
   if (!geometry) {
     Mesh mesh;
-    gl::MatrixStack & m = mesh.getModel();
+    MatrixStack & m = mesh.getModel();
 
     m.push();
     {
@@ -411,7 +365,7 @@ void GlUtils::renderRift() {
 
   // The Rift model is aligned with the wrong axis, so we
   // rotate it by 90 degrees
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
   mv.push().rotate(angleAxis(-HALF_PI, GlUtils::X_AXIS));
   GlUtils::renderGeometry(geometry, program);
   mv.pop();
@@ -475,11 +429,11 @@ void GlUtils::drawAngleTicks() {
   }
 
   // Fix the modelview at exactly 1 unit away from the origin, no rotation
-  gl::Stacks::modelview().push(mat4(1)).translate(vec3(0, 0, -1));
+  Stacks::modelview().push(mat4(1)).translate(vec3(0, 0, -1));
   ProgramPtr program = getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
   program->use();
   renderGeometry(g, program);
-  gl::Stacks::modelview().pop();
+  Stacks::modelview().pop();
 }
 
 void GlUtils::draw3dGrid() {
@@ -589,7 +543,7 @@ void GlUtils::renderParagraph(const std::string & str) {
 void GlUtils::renderString(const std::string & str, vec3 & cursor3d,
     float fontSize, Resource fontResource) {
   vec4 target = vec4(cursor3d, 0);
-  target = gl::Stacks::projection().top() * gl::Stacks::modelview().top() * target;
+  target = Stacks::projection().top() * Stacks::modelview().top() * target;
   vec2 newCursor(target.x, target.y);
   renderString(str, newCursor, fontSize, fontResource);
 }
@@ -740,7 +694,7 @@ void cubeRecurseDraw(gl::GeometryPtr & cubeGeometry, gl::ProgramPtr & renderProg
   float angle = elapsed * 0.2f * ((rand() % 10) - 5);
 
   float scale = 0.7f;
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
   mv.with_push([&]{
     mv.rotate(angle, axis).translate(translation).scale(scale).apply(renderProgram);
     cubeGeometry->draw();
@@ -758,11 +712,11 @@ void GlUtils::cubeRecurse(int depth, float elapsed) {
   gl::ProgramPtr renderProgram = GlUtils::getProgram(
     Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
   renderProgram->use();
-  gl::Stacks::projection().apply(renderProgram);
+  Stacks::projection().apply(renderProgram);
 
   static gl::GeometryPtr cubeGeometry = GlUtils::getColorCubeGeometry();
   cubeGeometry->bindVertexArray();
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
   mv.with_push([&]{
     mv.scale(0.4f);
     mv.apply(renderProgram);
@@ -777,7 +731,7 @@ void GlUtils::dancingCubes(int elements, float elapsed) {
   gl::ProgramPtr renderProgram = GlUtils::getProgram(
     Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
   renderProgram->use();
-  gl::Stacks::projection().apply(renderProgram);
+  Stacks::projection().apply(renderProgram);
 
   static gl::GeometryPtr cubeGeometry = getColorCubeGeometry();
   cubeGeometry->bindVertexArray();
@@ -785,10 +739,10 @@ void GlUtils::dancingCubes(int elements, float elapsed) {
   static vec3 AXES[] = { GlUtils::X_AXIS, GlUtils::Y_AXIS,
     GlUtils::Z_AXIS };
 
-  gl::MatrixStack & mv = gl::Stacks::modelview();
+  MatrixStack & mv = Stacks::modelview();
   mv.with_push([&]{
     mv.scale(0.2f);
-    gl::Stacks::modelview().apply(renderProgram);
+    Stacks::modelview().apply(renderProgram);
     cubeGeometry->draw();
   });
 
@@ -807,12 +761,12 @@ void GlUtils::dancingCubes(int elements, float elapsed) {
 
     mv.with_push([&]{
       mv.translate(tr).scale(sc);
-      gl::Stacks::modelview().apply(renderProgram);
+      Stacks::modelview().apply(renderProgram);
       cubeGeometry->draw();
     });
     mv.with_push([&]{
       mv.translate(-tr).scale(sc);
-      gl::Stacks::modelview().apply(renderProgram);
+      Stacks::modelview().apply(renderProgram);
       cubeGeometry->draw();
     });
   }

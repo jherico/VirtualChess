@@ -12,7 +12,7 @@ struct Mesh {
   typedef std::vector<vec2> VVec2;
   typedef std::vector<GLuint> VS;
 
-  gl::MatrixStack model;
+  MatrixStack model;
   glm::vec3 color{ 1, 1, 1 };
 
   VVec4 positions;
@@ -31,7 +31,7 @@ public:
   {
   }
 
-  gl::MatrixStack & getModel() {
+  MatrixStack & getModel() {
     return model;
   }
 

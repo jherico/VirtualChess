@@ -308,14 +308,14 @@ public:
   void drawFrame() {
     static int frameIndex = 0;
     ovrHmd_BeginFrame(hmd, frameIndex++);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-    gl::MatrixStack & pr = gl::Stacks::projection();
+    MatrixStack & mv = Stacks::modelview();
+    MatrixStack & pr = Stacks::projection();
     for (int i = 0; i < 2; ++i) {
       ovrEyeType eye = currentEye = hmdDesc.EyeRenderOrder[i];
       PerEyeArgs & eyeArgs = eyesArgs[eye];
 
       pr.top() = eyeArgs.projection;
-      gl::Stacks::with_push(pr, mv, [&]{
+      Stacks::with_push(pr, mv, [&]{
         // Set up the per-eye projection matrix
         ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
 

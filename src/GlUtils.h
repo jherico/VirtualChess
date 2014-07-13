@@ -97,6 +97,13 @@ public:
   GLsizei elements;
   GLenum  elementType{ GL_TRIANGLES };
 
+  Geometry() {
+  }
+
+  template <typename Function>
+  Geometry(Function func, GLsizei count, GLenum elementType = GL_TRIANGLES) : elements(count), elementType(elementType) {
+    func(vertexBuffer, indexBuffer, vao);
+  }
   void bind() {
     vao.Bind();
   }
@@ -189,11 +196,16 @@ public:
     Resource vertexResource,
     Resource fragmentResource);
 
-  static void renderSkybox(
-    Resource firstResource);
-
-
   static Geometry & getColorCubeGeometry();
+  static Geometry & getChessBoardGeometry();
+
+  static void getCubeVertices(oglplus::Buffer & dest);
+
+  static void getCubeIndices(oglplus::Buffer & dest);
+
+  static void getCubeWireIndices(oglplus::Buffer & dest);
+
+  static const float CHESS_SCALE;
 
   /*
   static void drawColorCube(bool lit = false);
@@ -346,7 +358,7 @@ public:
 
   static void scaleRenderGrid(float scale, const vec2 & p) {
     vec2 p3 = quantize(p, scale);
-    gl::MatrixStack & mv = gl::Stacks::modelview();
+    MatrixStack & mv = Stacks::modelview();
     mv.push().translate(vec3(p3.x - scale, 0, p3.y - scale)).scale(
       scale);
     GlUtils::draw3dGrid();

@@ -65,10 +65,10 @@ void loadCtm(Mesh & mesh, const std::string & data) {
 }
 
 #define SET_PROJECTION(program) \
-  Uniform<mat4>(program, Layout::Uniform::Projection).Set(gl::Stacks::projection().top())
+  Uniform<mat4>(program, Layout::Uniform::Projection).Set(Stacks::projection().top())
 
 #define SET_MODELVIEW(program) \
-  Uniform<mat4>(program, Layout::Uniform::ModelView).Set(gl::Stacks::modelview().top())
+  Uniform<mat4>(program, Layout::Uniform::ModelView).Set(Stacks::modelview().top())
 
 namespace Piece {
   enum {
@@ -105,7 +105,7 @@ public:
     prog = GlUtils::getProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     for (int i = 0; i < Piece::COUNT; ++i) {
       Mesh pieceMesh;
-      pieceMesh.model.scale(0.08f);
+      pieceMesh.model.scale(1.2f);
       loadCtm(pieceMesh, Platform::getResourceString(PIECE_RESOURCES[i]));
       pieces[i].loadMesh(pieceMesh);
     }
@@ -138,13 +138,13 @@ public:
     }
 
     CameraControl::instance().applyInteraction(player);
-    gl::Stacks::modelview().top() = glm::inverse(player);
+    Stacks::modelview().top() = glm::inverse(player);
   }
 
   void drawScene() {
     glClearColor(0.4, 0.4, 0.4, 1);
     gl.Clear().ColorBuffer().DepthBuffer();
-    GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    Render::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     prog.Use();
     SET_PROJECTION(prog);
     SET_MODELVIEW(prog);
@@ -155,25 +155,36 @@ public:
     Uniform<vec4>(prog, "LightPosition[0]").Set(vec4(1));
     Uniform<vec4>(prog, "LightColor[0]").Set(vec4(1));
 
-    gl::MatrixStack & mv = gl::Stacks::modelview();
-#define SQUARE_LENGTH  0.05f
-    int piece = 0;
-    for (int i = 0; i < 8; ++i) {
-      for (int j = 0; j < 8; ++j) {
-        mv.withPush([&] {
-          mv.translate(vec3(SQUARE_LENGTH * i, 0, SQUARE_LENGTH * j));
-          SET_MODELVIEW(prog);
-          ++piece;
-          bool white = 0 == (piece % 2);
-          Uniform<vec4>(prog, "Color").Set(vec4(white ? Colors::white : Colors::darkBlue, 1));
-          piece %= Piece::COUNT;
-          pieces[piece].bind();
-          pieces[piece].draw();
-        });
+    MatrixStack & mv = Stacks::modelview();
+    mv.withPush([&]{
+      mv.scale(GlUtils::CHESS_SCALE);
+      mv.translate(vec3(-3.5, 0, -3.5));
+      int piece = 0;
+      for (int i = 0; i < 8; ++i) {
+        for (int j = 0; j < 8; ++j) {
+          mv.withPush([&] {
+            mv.translate(vec3(i, 0, j));
+            ++piece;
+            piece %= Piece::COUNT;
+
+            SET_MODELVIEW(prog);
+            bool white = 0 == (piece % 2);
+            Uniform<vec4>(prog, "Color").Set(vec4(white ? Colors::white : Colors::darkBlue, 1));
+
+            pieces[piece].bind();
+            pieces[piece].draw();
+//            Render::renderGeometry(prog, piece)
+          });
+        }
       }
-    }
+    });
+#define SQUARE_LENGTH  
     NoProgram().Use();
     NoVertexArray().Bind();
+
+    Render::renderGeometry(
+      GlUtils::getProgram(Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS),
+      GlUtils::getChessBoardGeometry());
 
     mv.withPush([&]{
       mv.scale(0.06f);
