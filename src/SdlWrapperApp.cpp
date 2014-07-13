@@ -19,76 +19,13 @@
 #include "Common.h"
 
 #include <regex>
-#include <opencv2/opencv.hpp>
 
 #ifdef __APPLE__
 #include <CoreGraphics/CGDirectDisplay.h>
 #include <CoreGraphics/CGDisplayConfiguration.h>
 #endif
 
-uvec2 getSize(GLFWmonitor * monitor) {
-  const GLFWvidmode * mode = glfwGetVideoMode(monitor);
-  return uvec2(mode->width, mode->height);
-}
-
-ivec2 getPosition(GLFWmonitor * monitor) {
-  ivec2 result;
-  glfwGetMonitorPos(monitor, &result.x, &result.y);
-  return result;
-}
-
-void GlfwApp::createSecondaryScreenWindow(const uvec2 & size) {
-  GLFWmonitor * primary = glfwGetPrimaryMonitor();
-  int monitorCount;
-  GLFWmonitor ** monitors = glfwGetMonitors(&monitorCount);
-  GLFWmonitor * best = nullptr;
-  uvec2 bestSize;
-  for (int i = 0; i < monitorCount; ++i) {
-    GLFWmonitor * cur = monitors[i];
-    if (cur == primary) {
-      continue;
-    }
-    uvec2 curSize = getSize(cur);
-    if (best == nullptr || (bestSize.x < curSize.x && bestSize.y < curSize.y)) {
-      best = cur;
-      bestSize = curSize;
-    }
-  }
-  if (nullptr == best) {
-    best = primary;
-    bestSize = getSize(best);
-  }
-  ivec2 pos = getPosition(best);
-  if (bestSize.x > size.x) {
-    pos.x += (bestSize.x - size.x) / 2;
-  }
-
-  if (bestSize.y > size.y) {
-    pos.y += (bestSize.y - size.y) / 2;
-  }
-  createWindow(size, pos);
-}
-
-void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action,
-    int mods) {
-  GlfwApp * instance = (GlfwApp *) glfwGetWindowUserPointer(window);
-  instance->onKey(key, scancode, action, mods);
-}
-
-void glfwErrorCallback(int error, const char* description) {
-  FAIL(description);
-}
-
-GlfwApp::GlfwApp()
-    : window(0) {
-  // Initialize the GLFW system for creating and positioning windows
-  if (!glfwInit()) {
-    FAIL("Failed to initialize GLFW");
-  }
-  glfwSetErrorCallback(glfwErrorCallback);
-}
-
-void APIENTRY debugCallback(
+void APIENTRY myGlDebugCallback(
     GLenum source,
     GLenum type,
     GLuint id,
@@ -136,6 +73,7 @@ void APIENTRY debugCallback(
   SAY("--- OpenGL Callback Message ---");
 }
 
+#if 0
 void GlfwApp::onCreate() {
   windowAspect = aspect(windowSize);
   windowAspectInverse = 1.0f / windowAspect;
@@ -152,26 +90,6 @@ void GlfwApp::onCreate() {
     FAIL("Failed to initialize GL3W");
   }
   glGetError();
-#if 1
-  GL_CHECK_ERROR;
-  glEnable (GL_DEBUG_OUTPUT_SYNCHRONOUS);
-  GL_CHECK_ERROR;
-  GLuint unusedIds = 0;
-  if (glDebugMessageCallback) {
-    glDebugMessageCallback(debugCallback, this);
-    GL_CHECK_ERROR;
-    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
-        0, &unusedIds, true);
-    GL_CHECK_ERROR;
-
-  } else if (glDebugMessageCallbackARB) {
-    glDebugMessageCallbackARB(debugCallback, this);
-    GL_CHECK_ERROR;
-    glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE,
-        0, &unusedIds, true);
-    GL_CHECK_ERROR;
-  }
-#endif
   GL_CHECK_ERROR;
 }
 
@@ -304,12 +222,6 @@ void GlfwApp::onKey(int key, int scancode, int action, int mods) {
   }
 }
 
-void GlfwApp::draw() {
-}
-
-void GlfwApp::update() {
-}
-
 GLFWmonitor * GlfwApp::getMonitorAtPosition(const ivec2 & position) {
   int count;
   GLFWmonitor ** monitors = glfwGetMonitors(&count);
@@ -322,6 +234,7 @@ GLFWmonitor * GlfwApp::getMonitorAtPosition(const ivec2 & position) {
   }
   return nullptr;
 }
+#endif
 
 /*
 #define MK(X, Y, Z) \

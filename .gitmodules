@@ -13,3 +13,12 @@
 [submodule "libraries/glm"]
 	path = libraries/glm
 	url = git@github.com:g-truc/glm.git
+[submodule "libraries/OpenCTM"]
+	path = libraries/OpenCTM
+	url = git@github.com:jherico/OpenCTM.git
+[submodule "libraries/libpng"]
+	path = libraries/libpng
+	url = https://github.com/jherico/libpng
+[submodule "libraries/zlib"]
+	path = libraries/zlib
+	url = https://github.com/jherico/zlib

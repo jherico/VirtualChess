@@ -70,15 +70,19 @@ using glm::quat;
 
 #include <GL/glew.h>
 
+#pragma warning( disable : 4068 4244)
 #include <oglplus/all.hpp>
 #include <oglplus/interop/glm.hpp>
 #include <oglplus/bound/texture.hpp>
 #include <oglplus/bound/framebuffer.hpp>
 #include <oglplus/bound/renderbuffer.hpp>
 #include <oglplus/bound/buffer.hpp>
+#pragma warning( default : 4068 4244)
 
 #include <OVR_CAPI.h>
 #include <OVR_CAPI_GL.h>
+
+#include <SDL.h>
 
 #include <Resources.h>
 
@@ -163,11 +167,16 @@ inline float aspect(T const & size) {
 }
 
 #include "Config.h"
+
+#include "Colors.h"
 #include "GlDebug.h"
 #include "GlStacks.h"
+#include "Mesh.h"
+
 #include "GlUtils.h"
 #include "Files.h"
-#include "GlfwApp.h"
+#include "Mesh.h"
+#include "SdlWrapperApp.h"
 #include "Interaction.h"
 #include "Rift.h"
 

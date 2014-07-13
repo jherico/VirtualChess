@@ -1,112 +1,156 @@
 #include "Common.h"
+
+#pragma warning( disable : 4068 4244 4099 4305 4101)
 #include <oglplus/shapes/cube.hpp>
 
-template <class T>
-class RiftWrapperApp : public RiftApp {
-public:
-  T * deferredApp{ nullptr };
+#include <oglplus/shapes/blender_mesh.hpp>
+#include <oglplus/shapes/wrapper.hpp>
+#include <oglplus/shapes/torus.hpp>
+#include <oglplus/shapes/obj_mesh.hpp>
 
-  virtual ~RiftWrapperApp() {
-    delete deferredApp;
-  }
+#include <oglplus/opt/resources.hpp>
+#include <oglplus/images/png.hpp>
+#include <oglplus/images/load.hpp>
 
-  virtual void initGl() {
-    RiftApp::initGl();
-    deferredApp = new T();
-    deferredApp->initGl();
-  }
+#include <oglplus/bound/texture.hpp>
+#include <oglplus/bound/framebuffer.hpp>
+#include <oglplus/bound/renderbuffer.hpp>
 
-  virtual void onKey(int key, int scancode, int action, int mods) {
-    deferredApp->onKey(key, scancode, action, mods);
-  }
+#include <oglplus/opt/resources.hpp>
+#include <oglplus/opt/list_init.hpp>
+#pragma warning( default : 4068 4244 4099 4305 4101)
 
-  virtual void update() {
-    deferredApp->update();
-  }
-
-  virtual void renderScene() {
-    deferredApp->renderScene();
-  }
-};
-
+#include <openctmpp.h>
 
 using namespace oglplus;
-class BaseApp {
-public:
-  virtual void onKey(int key, int scancode, int action, int mods) {
+
+
+void loadCtm(Mesh & mesh, const std::string & data) {
+  CTMimporter importer;
+  importer.LoadData(data);
+
+  int vertexCount = importer.GetInteger(CTM_VERTEX_COUNT);
+  mesh.positions.resize(vertexCount);
+  const float * ctmData = importer.GetFloatArray(CTM_VERTICES);
+  for (int i = 0; i < vertexCount; ++i) {
+    glm::vec4 pos(glm::make_vec3(ctmData + (i * 3)), 1);
+    pos = mesh.model.top() * pos;
+    pos /= pos.w;
+    mesh.positions[i] = vec4(glm::make_vec3(&pos.x), 1);
   }
 
-  virtual void update() {
-  }
-
-  virtual void initGl() {
-  }
-
-  virtual void renderScene() = 0;
-};
-
-class VirtualChess : public BaseApp{
-  Context gl;
-  Program prog;
-
-  // helper object building cube vertex attributes
-  shapes::Cube make_cube;
-  // helper object encapsulating cube drawing instructions
-  shapes::DrawingInstructions cube_instr;
-  // indices pointing to cube primitive elements
-  shapes::Cube::IndexArray cube_indices;
-
-  // Uniforms
-  Uniform<mat4> uProjection;
-  Uniform<mat4> uModelView;
-
-  // A vertex array object for the rendered cube
-  VertexArray cube;
-  // VBOs for the cube's vertices
-  Buffer verts;
-  
-public:
-  VirtualChess() : 
-    uProjection(prog, Layout::Uniform::Projection), 
-    uModelView(prog, Layout::Uniform::ModelView),
-    cube_instr(make_cube.Instructions()), 
-    cube_indices(make_cube.Indices()) {
-    gl::Stacks::modelview().top() = glm::lookAt(vec3(0, 0, 0.5), vec3(0, 0, 0), vec3(0, 1, 0));
-  }
-
-  virtual void initGl() {
-    prog = GlUtils::getProgram(Resource::SHADERS_SIMPLE_VS, Resource::SHADERS_COLORED_FS);
-    cube.Bind();
-    // bind the VBO for the cube vertices
-    verts.Bind(Buffer::Target::Array);
-    {
-      std::vector<GLfloat> data;
-      GLuint n_per_vertex = make_cube.Positions(data);
-      // upload the data
-      Buffer::Data(Buffer::Target::Array, data);
-      // setup the vertex attribs array for the vertices
-      VertexArrayAttrib attr(prog, "Position");
-      attr.Setup<GLfloat>(n_per_vertex);
-      attr.Enable();
-      NoVertexArray().Bind();
-      attr.Disable();
+  if (importer.GetInteger(CTM_UV_MAP_COUNT) > 0) {
+    const float * ctmData = importer.GetFloatArray(CTM_UV_MAP_1);
+    mesh.texCoords.resize(vertexCount);
+    for (int i = 0; i < vertexCount; ++i) {
+      mesh.texCoords[i] = glm::make_vec2(ctmData + (i * 2));
     }
   }
 
-  void renderScene() {
+  bool hasNormals = importer.GetInteger(CTM_HAS_NORMALS) ? true : false;
+  if (hasNormals) {
+    mesh.normals.resize(vertexCount);
+    ctmData = importer.GetFloatArray(CTM_NORMALS);
+    for (int i = 0; i < vertexCount; ++i) {
+      mesh.normals[i] = vec4(glm::make_vec3(ctmData + (i * 3)), 1);
+    }
+  }
+
+  int indexCount = 3 * importer.GetInteger(CTM_TRIANGLE_COUNT);
+  const CTMuint * ctmIntData = importer.GetIntegerArray(CTM_INDICES);
+  mesh.indices.resize(indexCount);
+  for (int i = 0; i < indexCount; ++i) {
+    mesh.indices[i] = *(ctmIntData + i);
+  }
+}
+
+#define SET_PROJECTION(program) \
+  Uniform<mat4>(program, Layout::Uniform::Projection).Set(gl::Stacks::projection().top())
+
+#define SET_MODELVIEW(program) \
+  Uniform<mat4>(program, Layout::Uniform::ModelView).Set(gl::Stacks::modelview().top())
+
+class VirtualChess : public RiftApp {
+  bool quit{ false };
+  mat4 player;
+
+  Program prog;
+  Geometry piece;
+  
+public:
+  VirtualChess(const RiftWrapperArgs & args) : RiftApp(args) {
+    player = glm::inverse(glm::lookAt(vec3(0, 0, 0.5), vec3(0, 0, 0), vec3(0, 1, 0)));
+    prog = GlUtils::getProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
+    {
+      Mesh pieceMesh;
+      pieceMesh.model.scale(0.1f);
+      loadCtm(pieceMesh, Platform::getResourceString(Resource::MESHES_CHESS_KNIGHT_CTM));
+      piece.loadMesh(pieceMesh);
+    }
+  }
+
+  virtual bool isDone() {
+    return quit;
+  }
+
+  void updateState() {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.sym) {
+        case SDLK_r:
+          ovrHmd_ResetSensor(hmd);
+          return;
+
+        case SDLK_ESCAPE:
+          quit = true;
+          return;
+        }
+      }
+
+      if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+        quit = true;
+        return;
+      }
+      CameraControl::instance().onEvent(event);
+    }
+
+    CameraControl::instance().applyInteraction(player);
+    gl::Stacks::modelview().top() = glm::inverse(player);
+  }
+
+  void drawScene() {
     glClearColor(0.4, 0.4, 0.4, 1);
     gl.Clear().ColorBuffer().DepthBuffer();
     GlUtils::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
     prog.Use();
-    uProjection.Set(gl::Stacks::projection().top());
+    SET_PROJECTION(prog);
+    SET_MODELVIEW(prog);
+
+    Uniform<vec4>(prog, "Ambient").Set(vec4(0.3, 0.3, 0.3, 1.0));
+    Uniform<int>(prog, "LightCount").Set(1);
+    Uniform<int>(prog, "LightCount").Set(1);
+    Uniform<vec4>(prog, "LightPosition[0]").Set(vec4(1));
+    Uniform<vec4>(prog, "LightColor[0]").Set(vec4(1));
+
     gl::MatrixStack & mv = gl::Stacks::modelview();
+    piece.bind();
+    piece.draw();
+    NoProgram().Use();
+    NoVertexArray().Bind();
+
     mv.withPush([&]{
-      mv.scale(0.04f);
-      uModelView.Set(mv.top());
-      cube.Bind();
-      cube_instr.Draw(cube_indices);
-      NoVertexArray().Bind();
+      mv.scale(0.06f);
+      Geometry & cube = GlUtils::getColorCubeGeometry();
+      Program & cubeProgram = GlUtils::getProgram(Resource::SHADERS_COLORED_VS, Resource::SHADERS_COLORED_FS);
+      cubeProgram.Use();
+      SET_MODELVIEW(cubeProgram);
+      SET_PROJECTION(cubeProgram);
+      cube.bind();
+      cube.draw();
+      NoProgram().Use();
     });
+    NoVertexArray().Bind();
   }
 };
 

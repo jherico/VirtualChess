@@ -22,6 +22,46 @@
 #include <vector>
 #include <string>
 
+
+struct Light {
+  glm::vec4 position;
+  glm::vec4 color;
+
+  Light(const glm::vec4 & position = glm::vec4(1), const glm::vec4 & color =
+      glm::vec4(1)) {
+    this->position = position;
+    this->color = color;
+  }
+};
+
+class Lights {
+  std::vector<glm::vec4> lightPositions;
+  std::vector<glm::vec4> lightColors;
+  glm::vec4 ambient;
+
+public:
+  // Singleton class
+  Lights()
+      : ambient(glm::vec4(0.2, 0.2, 0.2, 1.0)) {
+    addLight();
+  }
+
+  void addLight(const glm::vec4 & position = glm::vec4(1),
+      const glm::vec4 & color = glm::vec4(1)) {
+    lightPositions.push_back(position);
+    lightColors.push_back(color);
+  }
+
+  void addLight(const Light & light) {
+    addLight(light.position, light.color);
+  }
+
+  void setAmbient(const glm::vec4 & ambient) {
+    this->ambient = ambient;
+  }
+};
+
+
 namespace Layout {
   namespace Attribute {
     enum {
@@ -42,6 +82,102 @@ namespace Layout {
   }
 }
 
+
+class Geometry {
+public:
+  typedef std::vector<vec4> VVec4;
+
+  static const int VERTEX_ATTRIBUTE_SIZE = 4;
+  static const int BYTES_PER_ATTRIBUTE = (sizeof(float) * VERTEX_ATTRIBUTE_SIZE);
+
+  oglplus::Buffer vertexBuffer;
+  oglplus::Buffer indexBuffer;
+  oglplus::VertexArray vao;
+
+  GLsizei elements;
+  GLenum  elementType{ GL_TRIANGLES };
+
+  void bind() {
+    vao.Bind();
+  }
+
+  void draw() {
+    glDrawElements(elementType, elements, GL_UNSIGNED_INT, (void*)0);
+  }
+
+  void drawInstanced(int count) {
+    glDrawElementsInstanced(elementType, elements, GL_UNSIGNED_INT, (void*)0, count);
+  }
+
+  void loadMesh(const Mesh & mesh)  {
+    using namespace oglplus;
+    size_t attributeCount = 1;
+    if (!mesh.normals.empty()) {
+      attributeCount++;
+    }
+    if (!mesh.colors.empty()) {
+      attributeCount++;
+    }
+    if (!mesh.texCoords.empty()) {
+      attributeCount++;
+    }
+
+    GLsizei stride = attributeCount * 4 * sizeof(GLfloat);
+    {
+      size_t vertexCount = mesh.positions.size();
+      VVec4 vertices;
+      vertices.reserve(vertexCount * attributeCount);
+      for (size_t i = 0; i < vertexCount; ++i) {
+        vertices.push_back(mesh.positions[i]);
+        if (!mesh.normals.empty()) {
+          vertices.push_back(mesh.normals[i]);
+        }
+        if (!mesh.colors.empty()) {
+          vertices.push_back(vec4(mesh.colors[i], 1));
+        }
+        if (!mesh.texCoords.empty()) {
+          vertices.push_back(vec4(mesh.texCoords[i], 1, 1));
+        }
+      }
+      Context().Bound(Buffer::Target::Array, vertexBuffer).Data(vertices);
+    }
+    Context().Bound(Buffer::Target::ElementArray, indexBuffer).Data(mesh.indices);
+    elements = mesh.indices.size();
+
+    GLsizei offset = 0;
+    vao.Bind();
+    vertexBuffer.Bind(Buffer::Target::Array);
+    indexBuffer.Bind(Buffer::Target::ElementArray);
+
+    // setup the vertex attribs array for the vertices
+    VertexArrayAttrib(Layout::Attribute::Position).
+      Pointer(3, DataType::Float, false, stride, (void*)offset).
+      Enable();
+
+    offset += (sizeof(GLfloat) * 4);
+    if (!mesh.normals.empty()) {
+      VertexArrayAttrib(Layout::Attribute::Normal).
+        Pointer(3, DataType::Float, false, stride, (void*)offset).
+        Enable();
+      offset += (sizeof(GLfloat) * 4);
+    }
+    if (!mesh.colors.empty()) {
+      VertexArrayAttrib(Layout::Attribute::Color).
+        Pointer(3, DataType::Float, false, stride, (void*)offset).
+        Enable();
+      offset += (sizeof(GLfloat) * 4);
+    }
+    if (!mesh.texCoords.empty()) {
+      VertexArrayAttrib(Layout::Attribute::TexCoord0).
+        Pointer(2, DataType::Float, false, stride, (void*)offset).
+        Enable();
+      offset += (sizeof(GLfloat) * 4);
+    }
+    NoVertexArray().Bind();
+  }
+};
+
+
 class GlUtils {
 public:
   static oglplus::Context & context();
@@ -57,6 +193,8 @@ public:
     Resource firstResource);
 
 
+  static Geometry & getColorCubeGeometry();
+
   /*
   static void drawColorCube(bool lit = false);
   static void drawQuad(
@@ -67,7 +205,8 @@ public:
   static void draw3dGrid();
   static void draw3dVector(vec3 vec, const vec3 & col);
 
-  static gl::GeometryPtr getColorCubeGeometry();
+  
+
   static gl::GeometryPtr getCubeGeometry();
   static gl::GeometryPtr getWireCubeGeometry();
 
@@ -255,153 +394,3 @@ public:
   static const vec3 UP;
 };
 
-struct Colors {
-  static const vec3 gray;
-  static const vec3 white;
-  static const vec3 red;
-  static const vec3 green;
-  static const vec3 blue;
-  static const vec3 cyan;
-  static const vec3 magenta;
-  static const vec3 yellow;
-  static const vec3 black;
-  static const vec3 aliceBlue;
-  static const vec3 antiqueWhite;
-  static const vec3 aqua;
-  static const vec3 aquamarine;
-  static const vec3 azure;
-  static const vec3 beige;
-  static const vec3 bisque;
-  static const vec3 blanchedAlmond;
-  static const vec3 blueViolet;
-  static const vec3 brown;
-  static const vec3 burlyWood;
-  static const vec3 cadetBlue;
-  static const vec3 chartreuse;
-  static const vec3 chocolate;
-  static const vec3 coral;
-  static const vec3 cornflowerBlue;
-  static const vec3 cornsilk;
-  static const vec3 crimson;
-  static const vec3 darkBlue;
-  static const vec3 darkCyan;
-  static const vec3 darkGoldenRod;
-  static const vec3 darkGray;
-  static const vec3 darkGrey;
-  static const vec3 darkGreen;
-  static const vec3 darkKhaki;
-  static const vec3 darkMagenta;
-  static const vec3 darkOliveGreen;
-  static const vec3 darkorange;
-  static const vec3 darkOrchid;
-  static const vec3 darkRed;
-  static const vec3 darkSalmon;
-  static const vec3 darkSeaGreen;
-  static const vec3 darkSlateBlue;
-  static const vec3 darkSlateGray;
-  static const vec3 darkSlateGrey;
-  static const vec3 darkTurquoise;
-  static const vec3 darkViolet;
-  static const vec3 deepPink;
-  static const vec3 deepSkyBlue;
-  static const vec3 dimGray;
-  static const vec3 dimGrey;
-  static const vec3 dodgerBlue;
-  static const vec3 fireBrick;
-  static const vec3 floralWhite;
-  static const vec3 forestGreen;
-  static const vec3 fuchsia;
-  static const vec3 gainsboro;
-  static const vec3 ghostWhite;
-  static const vec3 gold;
-  static const vec3 goldenRod;
-  static const vec3 grey;
-  static const vec3 greenYellow;
-  static const vec3 honeyDew;
-  static const vec3 hotPink;
-  static const vec3 indianRed;
-  static const vec3 indigo;
-  static const vec3 ivory;
-  static const vec3 khaki;
-  static const vec3 lavender;
-  static const vec3 lavenderBlush;
-  static const vec3 lawnGreen;
-  static const vec3 lemonChiffon;
-  static const vec3 lightBlue;
-  static const vec3 lightCoral;
-  static const vec3 lightCyan;
-  static const vec3 lightGoldenRodYellow;
-  static const vec3 lightGray;
-  static const vec3 lightGrey;
-  static const vec3 lightGreen;
-  static const vec3 lightPink;
-  static const vec3 lightSalmon;
-  static const vec3 lightSeaGreen;
-  static const vec3 lightSkyBlue;
-  static const vec3 lightSlateGray;
-  static const vec3 lightSlateGrey;
-  static const vec3 lightSteelBlue;
-  static const vec3 lightYellow;
-  static const vec3 lime;
-  static const vec3 limeGreen;
-  static const vec3 linen;
-  static const vec3 maroon;
-  static const vec3 mediumAquaMarine;
-  static const vec3 mediumBlue;
-  static const vec3 mediumOrchid;
-  static const vec3 mediumPurple;
-  static const vec3 mediumSeaGreen;
-  static const vec3 mediumSlateBlue;
-  static const vec3 mediumSpringGreen;
-  static const vec3 mediumTurquoise;
-  static const vec3 mediumVioletRed;
-  static const vec3 midnightBlue;
-  static const vec3 mintCream;
-  static const vec3 mistyRose;
-  static const vec3 moccasin;
-  static const vec3 navajoWhite;
-  static const vec3 navy;
-  static const vec3 oldLace;
-  static const vec3 olive;
-  static const vec3 oliveDrab;
-  static const vec3 orange;
-  static const vec3 orangeRed;
-  static const vec3 orchid;
-  static const vec3 paleGoldenRod;
-  static const vec3 paleGreen;
-  static const vec3 paleTurquoise;
-  static const vec3 paleVioletRed;
-  static const vec3 papayaWhip;
-  static const vec3 peachPuff;
-  static const vec3 peru;
-  static const vec3 pink;
-  static const vec3 plum;
-  static const vec3 powderBlue;
-  static const vec3 purple;
-  static const vec3 rosyBrown;
-  static const vec3 royalBlue;
-  static const vec3 saddleBrown;
-  static const vec3 salmon;
-  static const vec3 sandyBrown;
-  static const vec3 seaGreen;
-  static const vec3 seaShell;
-  static const vec3 sienna;
-  static const vec3 silver;
-  static const vec3 skyBlue;
-  static const vec3 slateBlue;
-  static const vec3 slateGray;
-  static const vec3 slateGrey;
-  static const vec3 snow;
-  static const vec3 springGreen;
-  static const vec3 steelBlue;
-  static const vec3 blueSteel;
-  static const vec3 tan;
-  static const vec3 teal;
-  static const vec3 thistle;
-  static const vec3 tomato;
-  static const vec3 turquoise;
-  static const vec3 violet;
-  static const vec3 wheat;
-  static const vec3 whiteSmoke;
-  static const vec3 yellowGreen;
-};

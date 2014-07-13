@@ -33,7 +33,7 @@ class CameraControl {
   void enableHydra(bool enable = true);
   void enableSpacemouse(bool enable = true);
   void enableJoystick(bool enable = true);
-  bool onKey(int key, int scancode, int action, int mods);
+  bool onEvent(const SDL_Event & event);
 
 };
 
@@ -71,7 +71,7 @@ struct AxisCalibration {
     return result;
   }
 };
-
+/*
 class GlfwJoystick {
 protected:
   typedef std::shared_ptr<AxisCalibration> Ptr;
@@ -309,3 +309,4 @@ public:
 };
 
 } // Namespace SaitekX52Pro
+*/

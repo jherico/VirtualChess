@@ -65,15 +65,20 @@ set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND EXAMPLE_LIBS glew)
 
+
+include_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/include)
+link_directories (${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86)
+list(APPEND EXAMPLE_LIBS SDL2)
+
 # GLFW - Cross platform OpenGL window creation and input handling
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
-set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
-add_subdirectory(libraries/glfw)
-set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
-include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
-list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
+#set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
+#set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
+#set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
+#set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
+#add_subdirectory(libraries/glfw)
+#set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
+#include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
+#list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
 
 ###############################################################################
@@ -95,17 +100,43 @@ include_directories(libraries/OculusSDK/Bindings/C/Include)
 list(APPEND EXAMPLE_LIBS OVR_C)
 
 # OpenCTM - a 3D mesh compression
-#add_subdirectory(libraries/OpenCTM)
-#set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
-#include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
-#list(APPEND EXAMPLE_LIBS OpenCTM)
+add_subdirectory(libraries/OpenCTM)
+set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
+include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
+list(APPEND EXAMPLE_LIBS OpenCTM)
+
 
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  
 # OpenCV is OPTIONAL.  
-find_package( OpenCV QUIET REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
-list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
+#find_package( OpenCV QUIET REQUIRED)
+#include_directories(${OpenCV_INCLUDE_DIRS})
+#list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
+
+if((WIN32 OR APPLE))
+    # zlib
+    add_subdirectory(libraries/zlib)
+    set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/libraries/zlib)
+    include_directories(${CMAKE_BINARY_DIR}/libraries/zlib)
+    include_directories(${CMAKE_SOURCE_DIR}/libraries/zlib)
+    list(APPEND EXAMPLE_LIBS zlib)
+
+    # png
+    set(PNG_STATIC ON CACHE BOOL "Build PNG static library")
+    set(PNG_TESTS OFF CACHE BOOL "Build PNG tests")
+    set(PNG_SHARED OFF CACHE BOOL "Build PNG shared library")
+    add_subdirectory(libraries/libpng)
+    include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
+    include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
+    list(APPEND EXAMPLE_LIBS png)
+    set_target_properties(zlib PROPERTIES FOLDER "3rdparty")
+    set_target_properties(png PROPERTIES FOLDER "3rdparty")
+else()
+    find_package(PNG REQUIRED)
+    include_directories(${PNG_INCLUDE_DIR})
+    list(APPEND EXAMPLE_LIBS ${PNG_LIBRARIES})
+endif()
+
 
 find_package(Threads)
 list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )

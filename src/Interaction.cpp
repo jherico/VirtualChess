@@ -73,37 +73,19 @@ static quat getHydraOrientation(const sixenseControllerData & c) {
 }
 #endif
 
-bool CameraControl::onKey(int key, int scancode, int action, int mods) {
-  if (GLFW_PRESS != action && GLFW_RELEASE != action) {
-    return false;
-  }
-  SAY("KEY %s: %c", (GLFW_PRESS == action) ? "pressed" : "released", key);
-  int update = (GLFW_PRESS == action) ? 1 : 0;
-  switch (key) {
-  case GLFW_KEY_A:
-    keyboardTranslate.x = -update; return true;
-  case GLFW_KEY_D:
-    keyboardTranslate.x = update; return true;
-  case GLFW_KEY_W:
-    keyboardTranslate.z = -update; return true;
-  case GLFW_KEY_S:
-    keyboardTranslate.z = update; return true;
-  case GLFW_KEY_C:
-    keyboardTranslate.y = -update; return true;
-  case GLFW_KEY_F:
-    keyboardTranslate.y = update; return true;
-  case GLFW_KEY_UP:
-    keyboardRotate.x = -update; return true;
-  case GLFW_KEY_DOWN:
-    keyboardRotate.x = update; return true;
-  case GLFW_KEY_RIGHT:
-    keyboardRotate.y = -update; return true;
-  case GLFW_KEY_LEFT:
-    keyboardRotate.y = update; return true;
-  case GLFW_KEY_Q:
-    keyboardRotate.z = -update; return true;
-  case GLFW_KEY_E:
-    keyboardRotate.z = update; return true;
+bool CameraControl::onEvent(const SDL_Event & event) {
+  if (SDL_KEYUP == event.type || SDL_KEYDOWN == event.type) {
+    int update = (SDL_KEYDOWN == event.type ? 1 : 0);
+    switch (event.key.keysym.sym) {
+    case SDLK_a:
+      keyboardTranslate.x = -update; return true;
+    case SDLK_d:
+      keyboardTranslate.x = update; return true;
+    case SDLK_w:
+      keyboardTranslate.z = -update; return true;
+    case SDLK_s:
+      keyboardTranslate.z = update; return true;
+    }
   }
   return false;
 }
@@ -194,6 +176,7 @@ void CameraControl::applyInteraction(mat4 & camera) {
 
 #endif
 
+#if 0
   if (glfwJoystickPresent(0)) {
     static const char * joyName = glfwGetJoystickName(0);
     static bool x52present =
@@ -243,6 +226,7 @@ void CameraControl::applyInteraction(mat4 & camera) {
     rotateCamera(camera, rotation);
     recompose(camera);
   }
+#endif
 
   static uint32_t lastKeyboardUpdateTick = 0;
   uint32_t now = Platform::elapsedMillis();
@@ -258,6 +242,7 @@ void CameraControl::applyInteraction(mat4 & camera) {
     }
   }
   lastKeyboardUpdateTick = now;
+
 }
 
 //
@@ -317,3 +302,4 @@ void CameraControl::applyInteraction(mat4 & camera) {
 //    sixenseGetAllNewestData(&acd);
 //    sixenseUtils::getTheControllerManager()->update(&acd);
 //  }
+
