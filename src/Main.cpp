@@ -77,7 +77,7 @@ namespace Piece {
     KNIGHT,
     BISHOP,
     QUEEN,
-//    KING,
+    KING,
     COUNT
   };
 }
@@ -97,7 +97,7 @@ class VirtualChess : public RiftApp {
   mat4 player;
 
   Program prog;
-  Geometry pieces[5];
+  Geometry pieces[6];
   
 public:
   VirtualChess(const RiftWrapperArgs & args) : RiftApp(args) {
@@ -105,7 +105,7 @@ public:
     prog = GlUtils::getProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     for (int i = 0; i < Piece::COUNT; ++i) {
       Mesh pieceMesh;
-      pieceMesh.model.scale(1.2f);
+      pieceMesh.model.scale(1.6f);
       loadCtm(pieceMesh, Platform::getResourceString(PIECE_RESOURCES[i]));
       pieces[i].loadMesh(pieceMesh);
     }
@@ -168,8 +168,8 @@ public:
             piece %= Piece::COUNT;
 
             SET_MODELVIEW(prog);
-            bool white = 0 == (piece % 2);
-            Uniform<vec4>(prog, "Color").Set(vec4(white ? Colors::white : Colors::darkBlue, 1));
+            bool white = 0 == (piece % 3);
+            Uniform<vec4>(prog, "Color").Set(vec4(white ? Colors::white : Colors::black, 1));
 
             pieces[piece].bind();
             pieces[piece].draw();
