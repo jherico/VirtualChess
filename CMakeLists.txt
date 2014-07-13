@@ -67,7 +67,11 @@ list(APPEND EXAMPLE_LIBS glew)
 
 
 include_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/include)
-link_directories (${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86)
+if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x64)
+else()
+    link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86)
+endif()
 list(APPEND EXAMPLE_LIBS SDL2)
 
 # GLFW - Cross platform OpenGL window creation and input handling
