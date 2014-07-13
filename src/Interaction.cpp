@@ -176,6 +176,24 @@ void CameraControl::applyInteraction(mat4 & camera) {
 
 #endif
 
+  static SDL_Joystick* joystick = SDL_JoystickOpen(0);
+
+  vec3 translation;
+  //quat rotation;
+  if (nullptr != joystick) {
+    translation.x = SDL_JoystickGetAxis(joystick, 0);
+    translation.z = SDL_JoystickGetAxis(joystick, 1);
+    translation.y = -SDL_JoystickGetAxis(joystick, 3);
+    //translation.y = SDL_JoystickGetAxis(joystick, 3);
+    translation /= 32767.0f;
+  }
+  if (glm::length(translation) > 0.02f) {
+    translateCamera(camera, translation / 100.0f);
+  }
+//  rotateCamera(camera, rotation);
+//  recompose(camera);
+
+
 #if 0
   if (glfwJoystickPresent(0)) {
     static const char * joyName = glfwGetJoystickName(0);
@@ -189,8 +207,6 @@ void CameraControl::applyInteraction(mat4 & camera) {
             (GlfwJoystick*)new Xbox::Controller(0)
         );
     joystick->read();
-    vec3 translation;
-    quat rotation;
     float scale = 500.0f;
 
     if (x52present) {
