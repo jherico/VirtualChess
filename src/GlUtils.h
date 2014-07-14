@@ -116,72 +116,7 @@ public:
     glDrawElementsInstanced(elementType, elements, GL_UNSIGNED_INT, (void*)0, count);
   }
 
-  void loadMesh(const Mesh & mesh)  {
-    using namespace oglplus;
-    size_t attributeCount = 1;
-    if (!mesh.normals.empty()) {
-      attributeCount++;
-    }
-    if (!mesh.colors.empty()) {
-      attributeCount++;
-    }
-    if (!mesh.texCoords.empty()) {
-      attributeCount++;
-    }
-
-    GLsizei stride = attributeCount * 4 * sizeof(GLfloat);
-    {
-      size_t vertexCount = mesh.positions.size();
-      VVec4 vertices;
-      vertices.reserve(vertexCount * attributeCount);
-      for (size_t i = 0; i < vertexCount; ++i) {
-        vertices.push_back(mesh.positions[i]);
-        if (!mesh.normals.empty()) {
-          vertices.push_back(mesh.normals[i]);
-        }
-        if (!mesh.colors.empty()) {
-          vertices.push_back(vec4(mesh.colors[i], 1));
-        }
-        if (!mesh.texCoords.empty()) {
-          vertices.push_back(vec4(mesh.texCoords[i], 1, 1));
-        }
-      }
-      Context().Bound(Buffer::Target::Array, vertexBuffer).Data(vertices);
-    }
-    Context().Bound(Buffer::Target::ElementArray, indexBuffer).Data(mesh.indices);
-    elements = mesh.indices.size();
-
-    GLsizei offset = 0;
-    vao.Bind();
-    vertexBuffer.Bind(Buffer::Target::Array);
-    indexBuffer.Bind(Buffer::Target::ElementArray);
-
-    // setup the vertex attribs array for the vertices
-    VertexArrayAttrib(Layout::Attribute::Position).
-      Pointer(3, DataType::Float, false, stride, (void*)offset).
-      Enable();
-
-    offset += (sizeof(GLfloat) * 4);
-    if (!mesh.normals.empty()) {
-      VertexArrayAttrib(Layout::Attribute::Normal).
-        Pointer(3, DataType::Float, false, stride, (void*)offset).
-        Enable();
-      offset += (sizeof(GLfloat) * 4);
-    }
-    if (!mesh.colors.empty()) {
-      VertexArrayAttrib(Layout::Attribute::Color).
-        Pointer(3, DataType::Float, false, stride, (void*)offset).
-        Enable();
-      offset += (sizeof(GLfloat) * 4);
-    }
-    if (!mesh.texCoords.empty()) {
-      VertexArrayAttrib(Layout::Attribute::TexCoord0).
-        Pointer(2, DataType::Float, false, stride, (void*)offset).
-        Enable();
-      offset += (sizeof(GLfloat) * 4);
-    }
-    NoVertexArray().Bind();
-  }
+  void loadMesh(const Mesh & mesh);
 };
 
 
