@@ -54,21 +54,37 @@ float Platform::elapsedSeconds() {
 
 static const size_t BUFFER_SIZE = 8192;
 
+
+std::string formatVarargs(const char * fmt_str, va_list ap) {
+  return std::string();
+//    int final_n, n = strlen(fmt_str) * 2; /* reserve 2 times as much as the length of the fmt_str */
+//    std::string str;
+//    std::unique_ptr<char[]> formatted;
+//    vsnprintf_s(SAY_BUFFER, BUFFER_SIZE, BUFFER_SIZE, message, arg);
+//
+//    while(1) {
+//        formatted.reset(new char[n]); /* wrap the plain char array into the unique_ptr */
+//        strcpy_s(&formatted[0], n, fmt_str);
+//        final_n = vsnprintf_s(&formatted[0], n, n, fmt_str, ap);
+//        if (final_n < 0 || final_n >= n)
+//            n += abs(final_n - n + 1);
+//        else
+//            break;
+//    }
+//    return std::string(formatted.get());
+}
+
+// If you got here, something's pretty wrong
 void Platform::fail(const char * file, int line, const char * message, ...) {
-  static char ERROR_BUFFER1[BUFFER_SIZE];
-  static char ERROR_BUFFER2[BUFFER_SIZE];
   va_list arg;
   va_start(arg, message);
-  vsnprintf_s(ERROR_BUFFER1, BUFFER_SIZE, BUFFER_SIZE, message, arg);
+  std::string string = formatVarargs(message, arg);
   va_end(arg);
-  _snprintf_s(ERROR_BUFFER2, BUFFER_SIZE, "FATAL %s (%d): %s", file, line,
-      ERROR_BUFFER1);
-  std::string error(ERROR_BUFFER2);
+  std::string error = format("FATAL %s (%d): %s", file, line, string.c_str());
   std::cerr << error << std::endl;
-  // If you got here, something's pretty wrong
 #ifdef WIN32
   if (NULL == GetConsoleWindow()) {
-    MessageBoxA(NULL, ERROR_BUFFER2, "Message", IDOK | MB_ICONERROR);
+    MessageBoxA(NULL, error.c_str(), "Message", IDOK | MB_ICONERROR);
   }
   DebugBreak();
 #endif
@@ -77,16 +93,23 @@ void Platform::fail(const char * file, int line, const char * message, ...) {
 }
 
 void Platform::say(std::ostream & out, const char * message, ...) {
-  static char SAY_BUFFER[BUFFER_SIZE];
   va_list arg;
   va_start(arg, message);
-  vsnprintf_s(SAY_BUFFER, BUFFER_SIZE, BUFFER_SIZE, message, arg);
+  std::string formatted = formatVarargs(message, arg);
   va_end(arg);
 #ifdef WIN32
-  OutputDebugStringA(SAY_BUFFER);
+  OutputDebugStringA(formatted.c_str());
   OutputDebugStringA("\n");
 #endif
-  out << std::string(SAY_BUFFER) << std::endl;
+  out << formatted << std::endl;
+}
+
+std::string Platform::format(const char * fmt_str, ...) {
+    va_list ap;
+    va_start(ap, fmt_str);
+    std::string result = formatVarargs(fmt_str, ap);
+    va_end(ap);
+    return result;
 }
 
 std::string Platform::getResourceString(Resource resource) {
@@ -105,27 +128,6 @@ std::vector<uint8_t> Platform::getResourceVector(Resource resource) {
   Resources::getResourceData(resource, &(result[0]));
   return result;
 }
-
-std::string Platform::format(const char * fmt_str, ...) {
-    int final_n, n = strlen(fmt_str) * 2; /* reserve 2 times as much as the length of the fmt_str */
-    std::string str;
-    std::unique_ptr<char[]> formatted;
-    va_list ap;
-    while(1) {
-        formatted.reset(new char[n]); /* wrap the plain char array into the unique_ptr */
-        strcpy_s(&formatted[0], n, fmt_str);
-        va_start(ap, fmt_str);
-        final_n = vsnprintf_s(&formatted[0], n, n, fmt_str, ap);
-        va_end(ap);
-        if (final_n < 0 || final_n >= n)
-            n += abs(final_n - n + 1);
-        else
-            break;
-    }
-    return std::string(formatted.get());
-}
-
-
 
 std::string Platform::replaceAll(const std::string & in, const std::string & from, const std::string & to) {
   std::string str(in);

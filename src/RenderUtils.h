@@ -20,7 +20,7 @@ public:
   }
 
   static void renderSkybox(Resource firstResource) {
-    using namespace oglplus; 
+    using namespace oglplus;
     static Program prog = GlUtils::getProgram(
         Resource::SHADERS_CUBEMAP_VS,
         Resource::SHADERS_CUBEMAP_FS);
@@ -48,7 +48,7 @@ public:
     MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.untranslate();
-      auto boundTexture = gl.Bound(Texture::Target::CubeMap, 
+      auto boundTexture = gl.Bound(Texture::Target::CubeMap,
         GlUtils::getCubemapTexture(firstResource));
   //    Uniform<mat4>(prog, Layout::Uniform::Projection).Set(Stacks::projection().top());
   //    Uniform<mat4>(prog, Layout::Uniform::ModelView).Set(Stacks::modelview().top());

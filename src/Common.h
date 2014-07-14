@@ -177,7 +177,6 @@ inline float aspect(T const & size) {
 #include "RenderUtils.h"
 #include "Files.h"
 #include "Mesh.h"
-#include "FicsClient.h"
 #include "SdlWrapperApp.h"
 #include "Interaction.h"
 #include "Rift.h"

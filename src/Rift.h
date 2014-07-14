@@ -153,40 +153,40 @@ class RiftWrapperApp : public SdlWrapperApp<T, RiftWrapperArgs>, public RiftMana
   int hmdDisplay;
 
 public:
-  RiftWrapperApp() {
-    // Attempt to find the Rift monitor.
-    windowPosition = hmdDesktopPosition;
-    hmdDisplay = getSdlDisplayAtPosition(windowPosition, windowSize);
-    if (-1 == hmdDisplay) {
-      FAIL("No Rift display found.");
-    }
-
-    Platform::sleepMillis(200);
-    if (!ovrHmd_StartSensor(hmd, 0, 0)) {
-      SAY_ERR("Could not attach to sensor device");
-    }
-  }
-
-  virtual ~RiftWrapperApp() {
-    ovrHmd_StopSensor(hmd);
-  }
-
-  RiftWrapperArgs getArgs() {
-    RiftWrapperArgs result;
-    result.hmd = hmd;
-    result.hmdDesc = hmdDesc;
-    result.windowSize = windowSize;
-    return result;
-  }
-
-  virtual SDL_Window * createWindow() {
-    setupSdlGlAttributes();
-    SDL_Window * result = SDL_CreateWindow("SDL", 
-      windowPosition.x, windowPosition.y, 
-      windowSize.x, windowSize.y,
-      SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN);
-    return result;
-  }
+//  RiftWrapperApp() {
+//    // Attempt to find the Rift monitor.
+//    windowPosition = hmdDesktopPosition;
+//    hmdDisplay = getSdlDisplayAtPosition(windowPosition, windowSize);
+//    if (-1 == hmdDisplay) {
+//      FAIL("No Rift display found.");
+//    }
+//
+//    Platform::sleepMillis(200);
+//    if (!ovrHmd_StartSensor(hmd, 0, 0)) {
+//      SAY_ERR("Could not attach to sensor device");
+//    }
+//  }
+//
+//  virtual ~RiftWrapperApp() {
+//    ovrHmd_StopSensor(hmd);
+//  }
+//
+//  RiftWrapperArgs getArgs() {
+//    RiftWrapperArgs result;
+//    result.hmd = hmd;
+//    result.hmdDesc = hmdDesc;
+//    result.windowSize = windowSize;
+//    return result;
+//  }
+//
+//  virtual SDL_Window * createWindow() {
+//    setupSdlGlAttributes();
+//    SDL_Window * result = SDL_CreateWindow("SDL",
+//      windowPosition.x, windowPosition.y,
+//      windowSize.x, windowSize.y,
+//      SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN);
+//    return result;
+//  }
 };
 
 
@@ -211,8 +211,8 @@ protected:
   ovrHmd      hmd;
 
 public:
-  RiftApp(const RiftWrapperArgs & args) : 
-      hmd(args.hmd), hmdDesc(args.hmdDesc), windowSize(args.windowSize) 
+  RiftApp(const RiftWrapperArgs & args) :
+      hmd(args.hmd), hmdDesc(args.hmdDesc), windowSize(args.windowSize)
   {
     initGl();
   }
@@ -296,7 +296,7 @@ public:
   virtual bool isDone() {
     return false;
   }
-  
+
   void onTick() {
     updateState();
     drawFrame();

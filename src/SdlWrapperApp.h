@@ -19,7 +19,7 @@
 
 #pragma once
 
-void APIENTRY myGlDebugCallback(GLenum source,
+void myGlDebugCallback(GLenum source,
   GLenum type,
   GLuint id,
   GLenum severity,
