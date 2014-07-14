@@ -1,4 +1,4 @@
-project(ExampleResources)
+project(ChessResources)
 include (GenerateExportHeader)
 
 set(RESOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
@@ -104,24 +104,24 @@ endif()
 if(WIN32)
     configure_file( cpp/Resources.rc.in Resources.rc )
     list(APPEND SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/Resources.rc)
-    add_library(ExampleResources SHARED ${SOURCE_FILES})
+    add_library(ChessResources SHARED ${SOURCE_FILES})
 elseif(APPLE)
     # For OSX, until I can figure out how to create a framework, we're stuck 
     # with embedding all the resounces in every single application bundle.
-    add_library(ExampleResources STATIC ${SOURCE_FILES})
+    add_library(ChessResources STATIC ${SOURCE_FILES})
     find_library(COREFOUNDATION_LIBRARY CoreFoundation)
     list(APPEND RESOURCE_LIBRARIES ${COREFOUNDATION_LIBRARY})
 else()
-    add_library(ExampleResources STATIC ${SOURCE_FILES})
+    add_library(ChessResources STATIC ${SOURCE_FILES})
 endif()
 
 generate_export_header( 
-    ExampleResources
+    ChessResources
     BASE_NAME Resources
     EXPORT_MACRO_NAME Resources_EXPORT
     EXPORT_FILE_NAME Resources_Export.h
     STATIC_DEFINE Resources_STATIC
 )
 
-target_link_libraries(ExampleResources ${RESOURCE_LIBRARIES})
+target_link_libraries(ChessResources ${RESOURCE_LIBRARIES})
 

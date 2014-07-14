@@ -56,15 +56,16 @@ elseif(APPLE)
 else()
 endif()
 
-
-
 # Cross platform access to OpenGL
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(libraries/glew)
 set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
-list(APPEND EXAMPLE_LIBS glew)
+list(APPEND PROJECT_LIBS glew)
 
+add_subdirectory(libraries/chess)
+include_directories(${CMAKE_SOURCE_DIR}/libraries/chess)
+list(APPEND PROJECT_LIBS chess)
 
 include_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/include)
 if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
@@ -72,17 +73,8 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
 else()
     link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86)
 endif()
-list(APPEND EXAMPLE_LIBS SDL2)
+list(APPEND PROJECT_LIBS SDL2)
 
-# GLFW - Cross platform OpenGL window creation and input handling
-#set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
-#set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
-#set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
-#set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
-#add_subdirectory(libraries/glfw)
-#set_target_properties(glfw PROPERTIES FOLDER "3rdparty")
-#include_directories(${CMAKE_SOURCE_DIR}/libraries/glfw/include)
-#list(APPEND EXAMPLE_LIBS glfw ${GLFW_LIBRARIES})
 
 
 ###############################################################################
@@ -101,13 +93,23 @@ set_target_properties(OculusVR PROPERTIES FOLDER "3rdparty")
 add_subdirectory(libraries/OculusSDK/Bindings/C)
 set_target_properties(OVR_C PROPERTIES FOLDER "3rdparty")
 include_directories(libraries/OculusSDK/Bindings/C/Include)
-list(APPEND EXAMPLE_LIBS OVR_C)
+list(APPEND PROJECT_LIBS OVR_C)
 
 # OpenCTM - a 3D mesh compression
 add_subdirectory(libraries/OpenCTM)
 set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
-list(APPEND EXAMPLE_LIBS OpenCTM)
+list(APPEND PROJECT_LIBS OpenCTM)
+
+
+set(Boost_USE_STATIC_LIBS    ON)
+set(Boost_USE_MULTITHREADED  ON)
+set(Boost_USE_STATIC_RUNTIME ON)
+find_package(Boost COMPONENTS filesystem system)
+include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_LIBRARY_DIR})
+
+#find_package( SDL )
 
 
 # Computer vision library with advanced image loading and manipulation 
@@ -115,7 +117,7 @@ list(APPEND EXAMPLE_LIBS OpenCTM)
 # OpenCV is OPTIONAL.  
 #find_package( OpenCV QUIET REQUIRED)
 #include_directories(${OpenCV_INCLUDE_DIRS})
-#list(APPEND EXAMPLE_LIBS ${OpenCV_LIBS})
+#list(APPEND PROJECT_LIBS ${OpenCV_LIBS})
 
 if((WIN32 OR APPLE))
     # zlib
@@ -123,7 +125,7 @@ if((WIN32 OR APPLE))
     set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/libraries/zlib)
     include_directories(${CMAKE_BINARY_DIR}/libraries/zlib)
     include_directories(${CMAKE_SOURCE_DIR}/libraries/zlib)
-    list(APPEND EXAMPLE_LIBS zlib)
+    list(APPEND PROJECT_LIBS zlib)
 
     # png
     set(PNG_STATIC ON CACHE BOOL "Build PNG static library")
@@ -132,18 +134,18 @@ if((WIN32 OR APPLE))
     add_subdirectory(libraries/libpng)
     include_directories(${CMAKE_SOURCE_DIR}/libraries/libpng)
     include_directories(${CMAKE_BINARY_DIR}/libraries/libpng)
-    list(APPEND EXAMPLE_LIBS png)
+    list(APPEND PROJECT_LIBS png)
     set_target_properties(zlib PROPERTIES FOLDER "3rdparty")
     set_target_properties(png PROPERTIES FOLDER "3rdparty")
 else()
     find_package(PNG REQUIRED)
     include_directories(${PNG_INCLUDE_DIR})
-    list(APPEND EXAMPLE_LIBS ${PNG_LIBRARIES})
+    list(APPEND PROJECT_LIBS ${PNG_LIBRARIES})
 endif()
 
 
 find_package(Threads)
-list(APPEND EXAMPLE_LIBS ${CMAKE_THREAD_LIBS_INIT} )
+list(APPEND PROJECT_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
 ###############################################################################
 #
@@ -173,10 +175,9 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)
 # source location at runtime.  
 #
 add_subdirectory(resources)
-set_target_properties(ExampleResources PROPERTIES FOLDER "Examples/Shared")
 include_directories(resources/cpp)
 include_directories(${CMAKE_BINARY_DIR}/resources)
-list(APPEND EXAMPLE_LIBS ExampleResources)
+list(APPEND PROJECT_LIBS ChessResources)
 
 ###############################################################################
 #

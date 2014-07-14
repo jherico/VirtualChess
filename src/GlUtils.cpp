@@ -247,7 +247,7 @@ Geometry & GlUtils::getChessBoardGeometry() {
       for (int y = 0; y < 8; ++y) {
         m.withPush([&]{
           m.translate(vec3(x, y, 0));
-          mesh.color = (x + y) % 2 ? Colors::wheat : Colors::saddleBrown;
+          mesh.color = (x + y) % 2 ? Colors::saddleBrown : Colors::wheat;
           mesh.addQuad(vec2(1.0));
           mesh.fillColors(true);
         });
