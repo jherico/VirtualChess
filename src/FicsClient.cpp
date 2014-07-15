@@ -1,146 +1,22 @@
 #include "Common.h"
 #include "FicsClient.h"
 
-#include <deque>
-#include <iostream>
-#include <boost/bind.hpp>
-#include <boost/asio.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/circular_buffer.hpp>
 #include <exception>
 
 using namespace boost;
 using namespace std;
 using boost::asio::ip::tcp;
 
-class SocketClient {
-public:
-  typedef boost::circular_buffer<char> WriteBuffer;
-  typedef deque<char> ReadBuffer;
+template <typename Function>
+void withScopedLock(boost::mutex & mutex, Function f) {
+  boost::mutex::scoped_lock lock(mutex);
+  f(lock);
+}
 
-private:
-  enum {
-    max_read_length = 512
-  };
-
-  boost::asio::io_service & io_service;
-  tcp::socket socket;
-
-  char socketReadBuffer[max_read_length];
-
-  // TODO switch to circular buffers, block on full buffer
-  WriteBuffer writeBuffer{8192};
-  ReadBuffer readBuffer;
-
-public:
-
-  SocketClient(boost::asio::io_service& io_service) :
-      io_service(io_service), socket(io_service) {
-  }
-
-  void write(const char msg) {
-    io_service.post(boost::bind(&SocketClient::doWrite, this, msg));
-  }
-
-  void write(const string msg) {
-    io_service.post(boost::bind(&SocketClient::doWriteString, this, msg));
-  }
-
-  void close() // call the do_close function via the io service in the other thread
-  {
-    io_service.post(boost::bind(&SocketClient::doClose, this));
-  }
-
-  void connect(tcp::resolver::iterator & endpoint_iterator) {
-    connectStart(endpoint_iterator);
-  }
-
-  virtual void onRead(ReadBuffer & readBuffer) = 0;
-
-private:
-
-  void connectStart(tcp::resolver::iterator & endpointIterator) {
-    tcp::endpoint endpoint = *endpointIterator;
-    socket.async_connect(endpoint,
-        boost::bind(&SocketClient::connectComplete, this,
-            boost::asio::placeholders::error, ++endpointIterator));
-  }
-
-  void connectComplete(const boost::system::error_code& error,
-      tcp::resolver::iterator endpoint_iterator) {
-    if (error) {
-      if (endpoint_iterator != tcp::resolver::iterator()) {
-        socket.close();
-        connectStart(endpoint_iterator);
-      }
-      return;
-    }
-    readStart();
-  }
-
-  void readStart(void) { // Start an asynchronous read and call read_complete when it completes or fails
-    socket.async_read_some(
-        boost::asio::buffer(socketReadBuffer, max_read_length),
-        boost::bind(&SocketClient::readComplete, this,
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::bytes_transferred));
-  }
-
-  void readComplete(const boost::system::error_code& error, size_t bytes_transferred) {
-    if (error) {
-      doClose();
-      return;
-    }
-    readBuffer.insert(readBuffer.end(), socketReadBuffer,
-        socketReadBuffer + bytes_transferred);
-
-    onRead(readBuffer);
-    readStart(); // start waiting for another asynchronous read again
-  }
-
-  void doWrite(const char msg) { // callback to handle write call from outside this class
-    bool write_in_progress = !writeBuffer.empty(); // is there anything currently being written?
-    writeBuffer.push_back(msg); // store in write buffer
-    if (!write_in_progress) // if nothing is currently being written, then start
-      writeStart();
-  }
-
-  void doWriteString(const string msg) {
-    bool write_in_progress = !writeBuffer.empty();
-    writeBuffer.insert(writeBuffer.end(), msg.begin(), msg.end());
-    if (!write_in_progress) {
-      writeStart();
-    }
-  }
-
-  // TODO write more than one byte at a time
-  void writeStart(void) {
-    boost::circular_buffer<char>::array_range ar = writeBuffer.array_one();
-    boost::asio::async_write(socket,
-        boost::asio::buffer(ar.first, ar.second),
-        boost::bind(&SocketClient::writeComplete, this,
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::bytes_transferred));
-  }
-
-  void writeComplete(const boost::system::error_code& error,
-      size_t bytes_transferred) {
-    if (error) {
-      doClose();
-      return;
-    }
-    writeBuffer.erase(writeBuffer.begin(),
-        writeBuffer.begin() + bytes_transferred);
-    if (!writeBuffer.empty()) {
-      writeStart();
-    }
-  }
-
-  void doClose() {
-    socket.close();
-  }
-};
+void log(const std::string & message) {
+  OutputDebugStringA(message.c_str());
+  OutputDebugStringA("\n");
+}
 
 namespace Fics {
 
@@ -355,11 +231,6 @@ namespace Fics {
 
   static const string PROMPT = "fics% ";
 
-  template <typename Function>
-  void withScopedLock(boost::mutex & mutex, Function f) {
-    boost::mutex::scoped_lock lock(mutex);
-    f(lock);
-  }
 
   const char * const INTERFACE_MACRO = "iset defprompt 1\n"
       "iset gameinfo 1\n"
@@ -382,17 +253,86 @@ namespace Fics {
     boost::mutex mutex;
   };
 
+  void GameState::parseStyle12(const string & gameState) {
+    enum Offsets {
+      BOARD = 5,
+      RANK_SIZE = 9,
+      NEXT_MOVE = BOARD + 8 * RANK_SIZE,
+      PAWN_PUSH = NEXT_MOVE + 2,
+    };
+    assert(0 == gameState.find("<12> "));
+    for (int rank = 0; rank < 8; ++rank) {
+      memcpy(board.position[rank], gameState.data() + rank * RANK_SIZE + BOARD, 8);
+    }
+    char c = gameState.at(NEXT_MOVE);
+    nextMove = c == 'W' ? Side::WHITE : Side::BLACK;
+    istringstream buf(gameState.substr(PAWN_PUSH));
+    // -1 if the previous move was NOT a double pawn push, otherwise the chess
+    //  board file(numbered 0--7 for a--h) in which the double push was made
+    buf >> pawnPush;
+    int castle;
+    buf >> castle;
+    //can White still castle short ? (0 = no, 1 = yes)
+    castling[Side::WHITE][CastlingDistance::SHORT] = castle ? true : false;
+    buf >> castle;
+    //can White still castle long ?
+    castling[Side::WHITE][CastlingDistance::LONG] = castle ? true : false;
+    buf >> castle;
+    //can Black still castle short ?
+    castling[Side::BLACK][CastlingDistance::SHORT] = castle ? true : false;
+    buf >> castle;
+    //can Black still castle long ?
+    castling[Side::BLACK][CastlingDistance::LONG] = castle ? true : false;
+      
+    //*the number of moves made since the last irreversible move.  (0 if last move
+    //  was irreversible.If the value is >= 100, the game can be declared a draw
+    //  due to the 50 move rule.)
+    buf >> reversibleMoves;
+    //* The game number
+    buf >> id;
+    //* White's name
+    buf >> players[Side::WHITE];
+    //* Black's name
+    buf >> players[Side::BLACK];
+    //* my relation to this game:
+    buf >> relation;
+
+    //* initial time(in seconds) of the match
+    buf >> initialTime;
+    //* increment In seconds) of the match
+    buf >> incrementTime;
+    //* White material strength
+    buf >> material[Side::WHITE];
+    //* Black material strength
+    buf >> material[Side::BLACK];
+    //* White's remaining time
+    buf >> remainingTime[Side::WHITE];
+    //* Black's remaining time
+    buf >> remainingTime[Side::BLACK];
+    //* the number of the move about to be made(standard chess numbering -- White's and Black's first moves are both 1, etc.)
+    buf >> moveNumber;
+    //* verbose coordinate notation for the previous move("none" if there were none)[note this used to be broken for examined games]
+    buf >> lastMoveVerbose;
+    //* time taken to make previous move "(min:sec)".
+    buf >> lastMoveTime;
+    //* pretty notation for the previous move("none" if there is none)
+    buf >> lastMovePretty;
+    //* flip field for board orientation : 1 = Black at bottom, 0
+    buf >> c;
+  }
+
   class SocketClient : public ::SocketClient {
     typedef std::shared_ptr<Command> CommandPtr;
     typedef map<int, CommandPtr> CommandMap;
 
     string readBuffer;
+    string username, password;
     CommandMap commandMap;
     boost::mutex commandMapLock;
     int commandId{10};
   public:
     enum State {
-      CONNECT, WAIT_LOGIN, WAIT_PASSWORD, LOGGED_IN, INTERFACE_SETUP, IDLE, ERROR
+      CONNECT, WAIT_LOGIN, WAIT_PASSWORD, LOGGED_IN, INTERFACE_SETUP, IDLE, FAIL
     };
 
     State state { WAIT_LOGIN };
@@ -404,6 +344,12 @@ namespace Fics {
       while (IDLE != state && ERROR != state) {
         Platform::sleepMillis(500);
       }
+    }
+
+    void connect(tcp::resolver::iterator & endpoint_iterator, const std::string & username, const std::string & password) {
+      this->username = username;
+      this->password = password;
+      ::SocketClient::connect(endpoint_iterator);
     }
 
     string command(const string & commandString) {
@@ -436,7 +382,8 @@ namespace Fics {
       switch (state) {
       case WAIT_LOGIN:
         if (string::npos != readBuffer.find("login:")) {
-          write("ariha\n");
+          write(username);
+          write("\n");
           readBuffer.clear();
           state = WAIT_PASSWORD;
         }
@@ -444,7 +391,8 @@ namespace Fics {
 
       case WAIT_PASSWORD:
         if (string::npos != readBuffer.find("password:")) {
-          write("borklu\n");
+          write(password);
+          write("\n");
           readBuffer.clear();
           state = LOGGED_IN;
         }
@@ -509,9 +457,9 @@ namespace Fics {
           c.condition.notify_one();
         });
       } else {
-        cout << "Unrequested command " << commandId << " result:" << endl;
-        cout << command.substr(codeSep);
-        cout << "=================" << endl;
+        log(Platform::format("Unrequested command %d result: ", commandId));
+        log(command.substr(codeSep));
+        log("=================");
       }
     }
 
@@ -521,44 +469,72 @@ namespace Fics {
         start = promptPos + PROMPT.size();
         promptPos = line.find(PROMPT, start);
       }
-      cout << line.substr(start) << endl;
+      log(line.substr(start));
     }
   };
 
-  class Test {
+  
+  class ClientImpl : public Client {
     boost::asio::io_service io_service;
     boost::asio::io_service::work work;
     boost::thread serviceThread;
     SocketClient client;
-    std::string readBuffer;
 
   public:
-    Test() :
-        client(io_service), work(io_service),
-        serviceThread(boost::bind(&boost::asio::io_service::run, &io_service)) {
+    ClientImpl() : client(io_service), work(io_service),
+      serviceThread(boost::bind(&boost::asio::io_service::run, &io_service)) {
     }
 
-    int run() {
+    virtual ~ClientImpl() {
+      client.close(); // close the telnet client connection
+      serviceThread.join(); // wait for the IO service thread to close
+    }
+    virtual void connect(const std::string & username, const std::string & password) {
       tcp::resolver resolver(io_service);
-      tcp::resolver::query query("localhost", "5000");
+      tcp::resolver::query query("freechess.org", "5000");
       tcp::resolver::iterator iterator = resolver.resolve(query);
-      client.connect(iterator);
+      client.connect(iterator, username, password);
       client.waitForIdle();
+    }
+
+    virtual GameList games() {
+      return GameList();
+    }
+  };
+
+  ClientPtr Client::create() {
+    return ClientPtr(new ClientImpl());
+  }
+
+  class Test {
+  public:
+    int run() {
+      boost::asio::io_service io_service;
+      boost::asio::io_service::work work(io_service);
+      boost::thread serviceThread(boost::bind(&boost::asio::io_service::run, &io_service));
+      tcp::resolver resolver(io_service);
+      tcp::resolver::query query("freechess.org", "5000");
+      tcp::resolver::iterator iterator = resolver.resolve(query);
+
+      SocketClient client(io_service);
+      client.connect(iterator, "ariha", "borklu");
+      client.waitForIdle();
+      //string testGame("<12> r-bqk--r pppp-ppp -----n-- --b-P--- -------- --N----- PPP-PPPP R-BQKB-R W -1 1 1 1 1 1 8 GuestLYKS GuestGJWZ 0 5 5 36 35 209 289 6 B/f8-c5 (0:13) Bc5 0 1 0");
+      //GameState state;
+      //state.parseStyle12(testGame);
       string gamesResult = client.command("games");
-      cout << gamesResult << endl;
-      cout << "=================" << endl;
+      log(gamesResult);
+      log("=================");
       string observeResult = client.command("observe 8");
-      cout << observeResult << endl;
-      cout << "=================" << endl;
+      log(observeResult);
+      log("=================");
       while (1) {
         Platform::sleepMillis(100);
       }
-      client.close(); // close the telnet client connection
-      serviceThread.join(); // wait for the IO service thread to close
       return 0;
     }
   };
 }
 
-RUN_APP(Fics::Test);
+ RUN_APP(Fics::Test);
 

@@ -63,19 +63,9 @@ set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND PROJECT_LIBS glew)
 
-#add_subdirectory(libraries/chess)
-#include_directories(${CMAKE_SOURCE_DIR}/libraries/chess)
-#list(APPEND PROJECT_LIBS chess)
-
 include_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/include)
-if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-    link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x64)
-else()
-    link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86)
-endif()
+link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86/)
 list(APPEND PROJECT_LIBS SDL2)
-
-
 
 ###############################################################################
 #
@@ -101,22 +91,23 @@ set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND PROJECT_LIBS OpenCTM)
 
-set(SDL_SHARED OFF CACHE BOOL "Build shared SDL libs")
-set(SDL_STATIC ON CACHE BOOL "Build static SDL libs")
-add_subdirectory(libraries/sdl2)
-include_directories(libraries/sdl2/include)
-list(APPEND PROJECT_LIBS SDL2-static)
-list(APPEND PROJECT_LIBS ${SDL2-static_LIB_DEPENDS})
+#add_subdirectory(libraries/sdl2)
+#include_directories(libraries/sdl2/include)
+#list(APPEND PROJECT_LIBS SDL2)
+#list(APPEND PROJECT_LIBS ${SDL2-LIB_DEPENDS})
 
 
+set(Boost_USE_STATIC_LIBS    ON)
 set(Boost_USE_MULTITHREADED  ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 find_package(Boost COMPONENTS filesystem system thread)
 include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_LIBRARY_DIR})
 list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
+#message(FATAL_ERROR ${Boost_LIBRARIES})
 
-#find_package( SDL )
-
+find_package(DirectX)
+link_directories(${DirectX_LIBRARY_PATHS})
 
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  

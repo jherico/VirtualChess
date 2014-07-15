@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <array>
+#include <deque>
 #include <iostream>
 #include <list>
 #include <map>
@@ -46,6 +47,12 @@
 #include <stack>
 #include <sstream>
 #include <unordered_map>
+
+#include <boost/bind.hpp>
+#include <boost/asio.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/circular_buffer.hpp>
 
 
 #define GLM_FORCE_RADIANS
@@ -167,17 +174,23 @@ inline float aspect(T const & size) {
   return (float)size.x / (float)size.y;
 }
 
+// Platform config
 #include "Config.h"
-#include "Stacks.h"
-#include "Colors.h"
 
+// First order dependencies
+#include "Colors.h"
+#include "Files.h"
+#include "Interaction.h"
+#include "Stacks.h"
+#include "SocketClient.h"
 #include "GlDebug.h"
+
+// Second order dependencies
 #include "Mesh.h"
+
+// Thord order
 #include "GlUtils.h"
 #include "RenderUtils.h"
-#include "Files.h"
-#include "Mesh.h"
 #include "SdlWrapperApp.h"
-#include "Interaction.h"
 #include "Rift.h"
 
