@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/locks.hpp>
+#include <boost/circular_buffer.hpp>
 #include <exception>
 
 using namespace boost;
@@ -14,6 +15,10 @@ using namespace std;
 using boost::asio::ip::tcp;
 
 class SocketClient {
+public:
+  typedef boost::circular_buffer<char> WriteBuffer;
+  typedef deque<char> ReadBuffer;
+
 private:
   enum {
     max_read_length = 512
@@ -21,12 +26,12 @@ private:
 
   boost::asio::io_service & io_service;
   tcp::socket socket;
+
   char socketReadBuffer[max_read_length];
-  boost::mutex writeLock;
-  deque<char> writeBuffer;
-  boost::mutex readLock;
-  deque<char> readBuffer;
-  boost::condition_variable readCond;
+
+  // TODO switch to circular buffers, block on full buffer
+  WriteBuffer writeBuffer{8192};
+  ReadBuffer readBuffer;
 
 public:
 
@@ -34,13 +39,11 @@ public:
       io_service(io_service), socket(io_service) {
   }
 
-  void write(const char msg) // pass the write data to the do_write function via the io service in the other thread
-      {
+  void write(const char msg) {
     io_service.post(boost::bind(&SocketClient::doWrite, this, msg));
   }
 
-  void write(const string msg) // pass the write data to the do_write function via the io service in the other thread
-      {
+  void write(const string msg) {
     io_service.post(boost::bind(&SocketClient::doWriteString, this, msg));
   }
 
@@ -53,16 +56,7 @@ public:
     connectStart(endpoint_iterator);
   }
 
-  string consume() {
-    std::string result;
-    boost::mutex::scoped_lock lock(readLock);
-    while (readBuffer.empty()) {
-      readCond.wait(lock);
-    }
-    result.assign(readBuffer.begin(), readBuffer.end());
-    readBuffer.clear();
-    return result;
-  }
+  virtual void onRead(ReadBuffer & readBuffer) = 0;
 
 private:
 
@@ -82,7 +76,6 @@ private:
       }
       return;
     }
-
     readStart();
   }
 
@@ -94,19 +87,15 @@ private:
             boost::asio::placeholders::bytes_transferred));
   }
 
-  void readComplete(const boost::system::error_code& error,
-      size_t bytes_transferred) {
+  void readComplete(const boost::system::error_code& error, size_t bytes_transferred) {
     if (error) {
       doClose();
       return;
     }
+    readBuffer.insert(readBuffer.end(), socketReadBuffer,
+        socketReadBuffer + bytes_transferred);
 
-    {
-      boost::mutex::scoped_lock lock(readLock);
-      readBuffer.insert(readBuffer.end(), socketReadBuffer,
-          socketReadBuffer + bytes_transferred);
-      readCond.notify_one();
-    }
+    onRead(readBuffer);
     readStart(); // start waiting for another asynchronous read again
   }
 
@@ -127,8 +116,9 @@ private:
 
   // TODO write more than one byte at a time
   void writeStart(void) {
+    boost::circular_buffer<char>::array_range ar = writeBuffer.array_one();
     boost::asio::async_write(socket,
-        boost::asio::buffer(&writeBuffer.front(), 1),
+        boost::asio::buffer(ar.first, ar.second),
         boost::bind(&SocketClient::writeComplete, this,
             boost::asio::placeholders::error,
             boost::asio::placeholders::bytes_transferred));
@@ -363,85 +353,112 @@ namespace Fics {
     };
   }
 
-  class Test {
-    boost::asio::io_service io_service;
-    boost::thread serviceThread;
-    boost::asio::io_service::work work;
-    SocketClient client;
-    std::string readBuffer;
+  static const string PROMPT = "fics% ";
 
+  template <typename Function>
+  void withScopedLock(boost::mutex & mutex, Function f) {
+    boost::mutex::scoped_lock lock(mutex);
+    f(lock);
+  }
+
+  const char * const INTERFACE_MACRO = "iset defprompt 1\n"
+      "iset gameinfo 1\n"
+      "iset ms 1\n"
+      "iset allresults 1\n"
+      "iset startpos 1\n"
+      "iset pendinfo 1\n"
+      "iset nowrap 1\n"
+      "set interface VirtualChess\n"
+      "set style 12\n"
+      "set bell 0\n"
+      "set ptime 0\n"
+      "iset block 1\n"
+      "1 iset lock 1\n";
+
+  struct Command {
+    int code;
+    string result;
+    boost::condition_variable condition;
+    boost::mutex mutex;
+  };
+
+  class SocketClient : public ::SocketClient {
+    typedef std::shared_ptr<Command> CommandPtr;
+    typedef map<int, CommandPtr> CommandMap;
+
+    string readBuffer;
+    CommandMap commandMap;
+    boost::mutex commandMapLock;
+    int commandId{10};
+  public:
     enum State {
-      CONNECT, WAIT_LOGIN, WAIT_PASSWORD, LOGGED_IN, INTERFACE_SETUP, IDLE,
+      CONNECT, WAIT_LOGIN, WAIT_PASSWORD, LOGGED_IN, INTERFACE_SETUP, IDLE, ERROR
     };
+
     State state { WAIT_LOGIN };
 
-    const char * const INTERFACE_MACRO = "iset defprompt 1\n"
-        "iset gameinfo 1\n"
-        "iset ms 1\n"
-        "iset allresults 1\n"
-        "iset startpos 1\n"
-        "iset pendinfo 1\n"
-        "iset nowrap 1\n"
-        "set interface VirtualChess\n"
-        "set style 12\n"
-        "set bell 0\n"
-        "set ptime 0\n"
-        "iset block 1\n"
-        "1 iset lock 1\n";
-
-  public:
-    Test() :
-        client(io_service), work(io_service),
-            serviceThread(
-                boost::bind(&boost::asio::io_service::run, &io_service)) {
-      tcp::resolver resolver(io_service);
-      // resolve the host name and port number to an iterator that can be used to connect to the server
-      // define an instance of the main class of this program
-      tcp::resolver::query query("localhost", "5000");
-      tcp::resolver::iterator iterator = resolver.resolve(query);
-      client.connect(iterator);
+    SocketClient(boost::asio::io_service& io_service) : ::SocketClient(io_service) {
     }
 
-    int run() {
-      while (1) {
-        readBuffer += client.consume();
-        switch (state) {
-        case CONNECT:
-          client.write("ariha\nborklu\n");
-          state = LOGGED_IN;
-          break;
-
-        case WAIT_LOGIN:
-          if (string::npos != readBuffer.find("login:")) {
-            client.write("ariha\n");
-            readBuffer.clear();
-            state = WAIT_PASSWORD;
-          }
-          break;
-
-        case WAIT_PASSWORD:
-          if (string::npos != readBuffer.find("password:")) {
-            client.write("borklu\n");
-            readBuffer.clear();
-            state = LOGGED_IN;
-          }
-          break;
-
-        case LOGGED_IN:
-          processReadBuffer();
-          client.write(INTERFACE_MACRO);
-          state = IDLE;
-          break;
-
-        case IDLE:
-          processReadBuffer();
-          break;
-        }
-        Platform::sleepMillis(100);
+    void waitForIdle() {
+      while (IDLE != state && ERROR != state) {
+        Platform::sleepMillis(500);
       }
-      client.close(); // close the telnet client connection
-      serviceThread.join(); // wait for the IO service thread to close
-      return 0;
+    }
+
+    string command(const string & commandString) {
+      int id = commandId++;
+
+      commandMap[id].reset(new Command());
+      Command & c = *(commandMap[id]);
+
+      // Write the command
+      write(Platform::format("%d %s\n", id, commandString.c_str()));
+
+      // Wait for the response
+      withScopedLock(c.mutex, [&](boost::mutex::scoped_lock & lock){
+        c.condition.wait(lock);
+      });
+
+      // Extract the result
+      string result = c.result;
+      commandMap.erase(id);
+      if (commandMap.empty()) {
+        commandId = 10;
+      }
+      return result;
+    }
+
+  protected:
+    void onRead(ReadBuffer & buffer) {
+      readBuffer.append(buffer.begin(), buffer.end());
+      buffer.clear();
+      switch (state) {
+      case WAIT_LOGIN:
+        if (string::npos != readBuffer.find("login:")) {
+          write("ariha\n");
+          readBuffer.clear();
+          state = WAIT_PASSWORD;
+        }
+        break;
+
+      case WAIT_PASSWORD:
+        if (string::npos != readBuffer.find("password:")) {
+          write("borklu\n");
+          readBuffer.clear();
+          state = LOGGED_IN;
+        }
+        break;
+
+      case LOGGED_IN:
+        write(INTERFACE_MACRO);
+        state = IDLE;
+        break;
+
+      case IDLE:
+        processReadBuffer();
+        break;
+      }
     }
 
     void processReadBuffer() {
@@ -456,7 +473,7 @@ namespace Fics {
         if (string::npos != commandStart && lineEnd >= commandStart) {
           break;
         }
-        cout << readBuffer.substr(0, lineEnd) << endl;
+        parseLine(readBuffer.substr(0, lineEnd));
         readBuffer.erase(0, lineEnd + 2);
         if (string::npos != commandStart ) {
           commandStart -= lineEnd;
@@ -478,26 +495,69 @@ namespace Fics {
       }
     }
 
+
     void parseCommand(const string & command) {
       int idSep = command.find(BlockDelimiter::BLOCK_SEPARATOR);
-      string commandIdStr = command.substr(0, idSep++);
-      int commandId = atoi(commandIdStr.c_str());
-      cout << "=================" << endl;
-      cout << "Command " << commandId << " result:" << endl;
-      int codeSep = command.find(BlockDelimiter::BLOCK_SEPARATOR, idSep);
-      string commandCodeStr = command.substr(idSep, codeSep++ - idSep);
-      int commandCode = atoi(commandCodeStr.c_str());
-      string commandResultStr = command.substr(codeSep);
-      cout << commandCode << endl;
-      cout << commandResultStr;
-      cout << "=================" << endl;
+      int codeSep = command.find(BlockDelimiter::BLOCK_SEPARATOR, idSep + 1);
+
+      commandId = atoi(command.substr(0, idSep++).c_str());
+      if (commandMap.count(commandId)) {
+        Command & c = *(commandMap[commandId]);
+        c.result = command.substr(codeSep);
+        c.code = atoi(command.substr(idSep, codeSep++ - idSep).c_str());
+        withScopedLock(c.mutex, [&](boost::mutex::scoped_lock & lock){
+          c.condition.notify_one();
+        });
+      } else {
+        cout << "Unrequested command " << commandId << " result:" << endl;
+        cout << command.substr(codeSep);
+        cout << "=================" << endl;
+      }
     }
 
     void parseLine(const string & line) {
-
+      int start = 0, promptPos = line.find(PROMPT);
+      while (string::npos != promptPos) {
+        start = promptPos + PROMPT.size();
+        promptPos = line.find(PROMPT, start);
+      }
+      cout << line.substr(start) << endl;
     }
   };
 
+  class Test {
+    boost::asio::io_service io_service;
+    boost::asio::io_service::work work;
+    boost::thread serviceThread;
+    SocketClient client;
+    std::string readBuffer;
+
+  public:
+    Test() :
+        client(io_service), work(io_service),
+        serviceThread(boost::bind(&boost::asio::io_service::run, &io_service)) {
+    }
+
+    int run() {
+      tcp::resolver resolver(io_service);
+      tcp::resolver::query query("localhost", "5000");
+      tcp::resolver::iterator iterator = resolver.resolve(query);
+      client.connect(iterator);
+      client.waitForIdle();
+      string gamesResult = client.command("games");
+      cout << gamesResult << endl;
+      cout << "=================" << endl;
+      string observeResult = client.command("observe 8");
+      cout << observeResult << endl;
+      cout << "=================" << endl;
+      while (1) {
+        Platform::sleepMillis(100);
+      }
+      client.close(); // close the telnet client connection
+      serviceThread.join(); // wait for the IO service thread to close
+      return 0;
+    }
+  };
 }
 
 RUN_APP(Fics::Test);

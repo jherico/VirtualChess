@@ -56,22 +56,17 @@ static const size_t BUFFER_SIZE = 8192;
 
 
 std::string formatVarargs(const char * fmt_str, va_list ap) {
-  return std::string();
-//    int final_n, n = strlen(fmt_str) * 2; /* reserve 2 times as much as the length of the fmt_str */
-//    std::string str;
-//    std::unique_ptr<char[]> formatted;
-//    vsnprintf_s(SAY_BUFFER, BUFFER_SIZE, BUFFER_SIZE, message, arg);
-//
-//    while(1) {
-//        formatted.reset(new char[n]); /* wrap the plain char array into the unique_ptr */
-//        strcpy_s(&formatted[0], n, fmt_str);
-//        final_n = vsnprintf_s(&formatted[0], n, n, fmt_str, ap);
-//        if (final_n < 0 || final_n >= n)
-//            n += abs(final_n - n + 1);
-//        else
-//            break;
-//    }
-//    return std::string(formatted.get());
+  va_list argcopy;
+  va_copy(argcopy, ap);
+  size_t size = vsnprintf(nullptr, 0, fmt_str, argcopy);
+  va_end(argcopy);
+
+  char * output = new char[size * 2];
+  size = vsnprintf(output, size * 2, fmt_str, ap);
+  std::string result;
+  result.assign(output, size);
+  delete [] output;
+  return result;
 }
 
 // If you got here, something's pretty wrong
