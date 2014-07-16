@@ -7,17 +7,6 @@ using namespace boost;
 using namespace std;
 using boost::asio::ip::tcp;
 
-template <typename Function>
-void withScopedLock(boost::mutex & mutex, Function f) {
-  boost::mutex::scoped_lock lock(mutex);
-  f(lock);
-}
-
-void log(const std::string & message) {
-  OutputDebugStringA(message.c_str());
-  OutputDebugStringA("\n");
-}
-
 namespace Fics {
 
   namespace BlockDelimiter {
@@ -253,6 +242,70 @@ namespace Fics {
     boost::mutex mutex;
   };
 
+
+
+  //------------------------------------------------------------------------------
+  // 25 (Exam.    0 Friar          0 Friar     ) [ uu  0   0] W:  1
+  // 28 ++++ TryMe       1737 Jack       [ su 30  20]  22:27 - 23:17 (29-30) W: 16
+  //  2 2274 OldManII    ++++ Peshkin    [ bu  2  12]   2:34 -  1:47 (39-39) B:  3
+  // 29 1622 Vman        1609 PopKid     [ sr 10  10]   1:14 -  5:10 (21-22) B: 18
+  // 32 1880 Raskapov    1859 RoboDweeb  [ br  2  12]   1:04 -  1:26 ( 9-10) B: 34
+  //  1 1878 Roberto     1881 baraka     [psr 45  30]  30:35 - 34:24 (22-22) W: 21
+  //
+  //  6 games displayed (of 23 in progress)
+  //------------------------------------------------------------------------------
+  // http://www.freechess.org/Help/HelpFiles/games.html
+  void GameSummary::parse(const string & summary) {
+    istringstream buf(summary);
+    buf >> id;
+    string str;
+    forEachSide([&](int side){
+      buf >> str;
+      if (string("++++") == str) {
+        ratings[side] = -1;
+      } else {
+        ratings[side] = atoi(str.c_str());
+      }
+      buf >> str;
+      players[side] = str;
+    });
+    private_ = 'p' == summary.at(38);
+    rated = 'r' == summary.at(40);
+    char c = summary.at(39);
+    switch (c) {
+    case 'b': type = GameType::BLITZ; break;
+    case 'l': type = GameType::LIGHTNING; break;
+    case 'u': type = GameType::UNTIMED; break;
+    case 'e': type = GameType::EXAMINED; break;
+    case 's': type = GameType::STANDARD; break;
+    case 'w': type = GameType::WILD; break;
+    case 'x': type = GameType::ATOMIC; break;
+    case 'z': type = GameType::CRAZYHOUSE; break;
+    case 'B': type = GameType::BUGHOUSE; break;
+    case 'L': type = GameType::LOSERS; break;
+    case 'S': type = GameType::SUICIDE; break;
+    case 'n': type = GameType::NON_STANDARD; break;
+    }
+  }
+
+  int pieceFromChar(char c) {
+    switch (c) {
+    case 'p': return WP; 
+    case 'r': return WR;
+    case 'n': return WN;
+    case 'b': return WB;
+    case 'q': return WQ;
+    case 'k': return WK;
+    case 'P': return BP;
+    case 'R': return BR;
+    case 'N': return BN;
+    case 'B': return BB;
+    case 'Q': return BQ;
+    case 'K': return BK;
+    }
+    return 0;
+  }
+
   void GameState::parseStyle12(const string & gameState) {
     enum Offsets {
       BOARD = 5,
@@ -262,7 +315,10 @@ namespace Fics {
     };
     assert(0 == gameState.find("<12> "));
     for (int rank = 0; rank < 8; ++rank) {
-      memcpy(board.position[rank], gameState.data() + rank * RANK_SIZE + BOARD, 8);
+      const char * rankData = gameState.data() + rank * RANK_SIZE + BOARD;
+      for (int col = 0; col < 8; ++col) {
+        board.position[rank][col] = pieceFromChar(rankData[col]);
+      }
     }
     char c = gameState.at(NEXT_MOVE);
     nextMove = c == 'W' ? Side::WHITE : Side::BLACK;
@@ -321,15 +377,20 @@ namespace Fics {
     buf >> c;
   }
 
+  /**
+
+  */
   class SocketClient : public ::SocketClient {
     typedef std::shared_ptr<Command> CommandPtr;
     typedef map<int, CommandPtr> CommandMap;
+    friend class ClientImpl;
 
     string readBuffer;
     string username, password;
     CommandMap commandMap;
     boost::mutex commandMapLock;
     int commandId{10};
+    boost::function<void(const string &)> lineCallback;
   public:
     enum State {
       CONNECT, WAIT_LOGIN, WAIT_PASSWORD, LOGGED_IN, INTERFACE_SETUP, IDLE, FAIL
@@ -451,44 +512,82 @@ namespace Fics {
       commandId = atoi(command.substr(0, idSep++).c_str());
       if (commandMap.count(commandId)) {
         Command & c = *(commandMap[commandId]);
-        c.result = command.substr(codeSep);
         c.code = atoi(command.substr(idSep, codeSep++ - idSep).c_str());
+        c.result = command.substr(codeSep);
         withScopedLock(c.mutex, [&](boost::mutex::scoped_lock & lock){
           c.condition.notify_one();
         });
       } else {
-        log(Platform::format("Unrequested command %d result: ", commandId));
-        log(command.substr(codeSep));
-        log("=================");
+        SAY("Unrequested command %d result: ", commandId);
+        SAY(command.substr(codeSep).c_str());
+        SAY("=================");
       }
     }
 
     void parseLine(const string & line) {
-      int start = 0, promptPos = line.find(PROMPT);
-      while (string::npos != promptPos) {
-        start = promptPos + PROMPT.size();
-        promptPos = line.find(PROMPT, start);
+      if (lineCallback) {
+        int start = 0, promptPos = line.find(PROMPT);
+        while (string::npos != promptPos) {
+          start = promptPos + PROMPT.size();
+          promptPos = line.find(PROMPT, start);
+        }
+        lineCallback(line.substr(start));
       }
-      log(line.substr(start));
     }
   };
 
-  
+  vector<string> parseFicsLines(const std::string lines) {
+    string lineEndings = (0 == lines.find("\r\n") ? "\r\n" : "\n\r");
+    return Strings::split(Strings::replaceAll(lines, lineEndings, "\n"), '\n');
+  }
+
+  GameList GameSummary::parseList(const std::string & gameListString) {
+    GameList result;
+    vector<string> lines = parseFicsLines(gameListString);
+    for_each(lines.begin(), lines.end(), [&](vector<string>::const_reference s){
+      if (s.empty()) {
+        return;
+      }
+      if (string::npos != s.find("(Exam.")) {
+        return;
+      }
+      if (0 == s.find("  ")) {
+        return;
+      }
+      GameSummary summary;
+      summary.parse(s);
+      result.push_back(summary);
+    });
+    return result;
+  }
+
+
   class ClientImpl : public Client {
     boost::asio::io_service io_service;
     boost::asio::io_service::work work;
     boost::thread serviceThread;
     SocketClient client;
+    boost::function<void(const GameState&)> gameStateCallback;
+
+    void onLine(const std::string & line) {
+      if (gameStateCallback && 0 == line.find("<12> ")) {
+          gameStateCallback(GameState(line));
+      } else {
+        SAY(line.c_str());
+      }
+    }
 
   public:
     ClientImpl() : client(io_service), work(io_service),
       serviceThread(boost::bind(&boost::asio::io_service::run, &io_service)) {
+      client.lineCallback = boost::bind(&ClientImpl::onLine, this, _1);
     }
 
     virtual ~ClientImpl() {
       client.close(); // close the telnet client connection
       serviceThread.join(); // wait for the IO service thread to close
     }
+
     virtual void connect(const std::string & username, const std::string & password) {
       tcp::resolver resolver(io_service);
       tcp::resolver::query query("freechess.org", "5000");
@@ -498,8 +597,28 @@ namespace Fics {
     }
 
     virtual GameList games() {
-      return GameList();
+      string gamesResult = client.command("games");
+      return GameSummary::parseList(gamesResult);
     }
+
+    virtual bool observe(int id) {
+      string observeResult = client.command(Platform::format("observe %d", id));
+      vector<string> lines = parseFicsLines(observeResult);
+      for (int i = 0; i < lines.size(); ++i) {
+        if (0 == lines[i].find("<12> ")) {
+          if (gameStateCallback) {
+            gameStateCallback(GameState(lines[i]));
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
+    virtual void setGameCallback(boost::function<void(const GameState&)> callback) {
+      gameStateCallback = callback;
+    }
+
   };
 
   ClientPtr Client::create() {
@@ -509,6 +628,9 @@ namespace Fics {
   class Test {
   public:
     int run() {
+      string gameListString = Platform::getResourceString(Resource::MISC_GAMELIST_TXT);
+      GameList gameList = GameSummary::parseList(gameListString);
+      /*
       boost::asio::io_service io_service;
       boost::asio::io_service::work work(io_service);
       boost::thread serviceThread(boost::bind(&boost::asio::io_service::run, &io_service));
@@ -523,18 +645,19 @@ namespace Fics {
       //GameState state;
       //state.parseStyle12(testGame);
       string gamesResult = client.command("games");
-      log(gamesResult);
-      log("=================");
+      SAY(gamesResult.c_str());
+      SAY("=================");
       string observeResult = client.command("observe 8");
-      log(observeResult);
-      log("=================");
+      SAY(observeResult.c_str());
+      SAY("=================");
       while (1) {
         Platform::sleepMillis(100);
       }
+      */
       return 0;
     }
   };
 }
 
- RUN_APP(Fics::Test);
+//RUN_APP(Fics::Test);
 

@@ -1,35 +1,7 @@
 #pragma once
 
 namespace Fics {
-
-  namespace GameType{
-    enum {
-      STANDARD,
-      NON_STANDARD,
-      UNTIMED,
-      EXAMINED,
-      LIGHTNING,
-      BLITZ,
-      SUICIDE,
-      WILD,
-      CRAZYHOUSE,
-      BUGHOUSE,
-      LOSERS,
-      ATOMIC,
-    };
-  }
-
-  namespace Side {
-    enum {
-      WHITE, BLACK,
-    };
-  }
-
-  namespace CastlingDistance {
-    enum {
-      SHORT, LONG,
-    };
-  }
+  using namespace Chess;
 
   enum GameRelation {
     ISOLATED = -3,
@@ -40,9 +12,6 @@ namespace Fics {
     OBSERVING = 0
   };
 
-  struct Board {
-    char position[8][8];
-  };
 
   struct GameBase {
     int          id;
@@ -50,13 +19,17 @@ namespace Fics {
   };
 
   // http://www.freechess.org/Help/HelpFiles/games.html
+  struct GameSummary;
+  typedef std::list<GameSummary> GameList;
+
   struct GameSummary : public GameBase {
     int     ratings[2];
-    int     type;
-    bool    private_;
-    bool    rated;
+    int     type{ -1 };
+    bool    private_{ false };
+    bool    rated{ false };
 
     void parse(const std::string & summary);
+    static GameList parseList(const std::string & listString);
   };
 
   typedef std::list<GameSummary> GameList;
@@ -78,6 +51,14 @@ namespace Fics {
     std::string  lastMoveTime;
     std::string  lastMovePretty;
 
+    GameState() {
+
+    }
+
+    GameState(const std::string & gameState) {
+      parseStyle12(gameState);
+    }
+
     void parseStyle12(const std::string & gameState);
   };
 
@@ -86,14 +67,15 @@ namespace Fics {
 
   class Client {
   protected:
-    Client() {
-
-    }
+    Client() { }
+    virtual ~Client() { }
 
   public:
     static ClientPtr create();
     virtual void connect(const std::string & username, const std::string & passwword) = 0;
     virtual GameList games() = 0;
+    virtual bool observe(int id) = 0;
+    virtual void setGameCallback(boost::function<void(const GameState&)> callback) = 0;
   };
 
 
