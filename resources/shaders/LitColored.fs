@@ -1,10 +1,11 @@
 #version 440
 
-uniform vec4 Ambient;
-uniform vec4 LightPosition[8];
-uniform vec4 LightColor[8];
-uniform int LightCount = 0;
-uniform float ForceAlpha = 0;
+layout (location = 8) uniform vec4 LightAmbient = vec4(0.5, 0.5, 0.5, 1.0);
+layout (location = 9) uniform int LightCount = 0;
+layout (location = 10) uniform float ForceAlpha = 0;
+
+layout (location = 16) uniform vec3 LightPosition[8];
+layout (location = 24) uniform vec4 LightColor[8];
 
 in vec3 vViewNormal;
 in vec4 vViewPosition;
@@ -14,7 +15,7 @@ out vec4 FragColor;
 vec4 DoLight()
 {
    vec3 normal = normalize(vViewNormal);
-   vec3 light = Ambient.rgb;
+   vec3 light = LightAmbient.rgb;
    float alpha = 1;
    for (int i = 0; i < int(LightCount); i++)
    {
