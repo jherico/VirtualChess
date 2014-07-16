@@ -10,8 +10,28 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(EXECUTABLE VirtualChess)
 
+MACRO(ADD_MSVC_PRECOMPILED_HEADER PrecompiledHeader PrecompiledSource SourcesVar)
+  IF(MSVC)
+    GET_FILENAME_COMPONENT(PrecompiledBasename ${PrecompiledHeader} NAME_WE)
+    SET(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${PrecompiledBasename}.pch")
+    #message(FATAL_ERROR ${${SourcesVar}})
+    SET(Sources ${${SourcesVar}})
+
+    SET_SOURCE_FILES_PROPERTIES(${PrecompiledSource}
+                                PROPERTIES COMPILE_FLAGS "/Yc\"${PrecompiledHeader}\" /Fp\"${PrecompiledBinary}\""
+                                           OBJECT_OUTPUTS "${PrecompiledBinary}")
+    SET_SOURCE_FILES_PROPERTIES(${Sources}
+                                PROPERTIES COMPILE_FLAGS "/Yu\"${PrecompiledHeader}\" /FI\"${PrecompiledHeader}\" /Fp\"${PrecompiledBinary}\""
+                                           OBJECT_DEPENDS "${PrecompiledBinary}")  
+    # Add precompiled header to SourcesVar
+    LIST(APPEND ${SourcesVar} ${PrecompiledSource})
+  ENDIF(MSVC)
+ENDMACRO(ADD_MSVC_PRECOMPILED_HEADER)
 
 if(WIN32)
+    list(REMOVE_ITEM SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Common.cpp)
+    ADD_MSVC_PRECOMPILED_HEADER("Common.h" "Common.cpp" SOURCE_FILES)
+    SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} /Zm200" )
     add_executable(${EXECUTABLE} WIN32 ${SOURCE_FILES})
 elseif(APPLE)
     list(APPEND SOURCE_FILES ${ALL_RESOURCES})
