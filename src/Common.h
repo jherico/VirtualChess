@@ -55,6 +55,12 @@
 #include <boost/circular_buffer.hpp>
 
 
+template <typename Function>
+void withScopedLock(boost::mutex & mutex, Function f) {
+  boost::mutex::scoped_lock lock(mutex);
+  f(lock);
+}
+
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -96,21 +102,6 @@ using glm::quat;
 
 typedef std::shared_ptr<void*> VoidPtr;
 
-template<class T>
-class circular_buffer : public std::list<T>{
-  size_t max;
-public:
-  circular_buffer(size_t max) : max(max) {
-  }
-  void push_back(const T & t) {
-    std::list<T>::push_back(t);
-    while (std::list<T>::size() > max) {
-      std::list<T>::pop_front();
-    }
-  }
-};
-
-
 class Platform {
 public:
     static void sleepMillis(int millis);
@@ -121,7 +112,6 @@ public:
     static std::string format(const char * formatString, ...);
     static std::string getResourceString(Resource resource);
     static std::vector<uint8_t> getResourceVector(Resource resource);
-    static std::string replaceAll(const std::string & in, const std::string & from, const std::string & to);
 };
 
 #ifndef PI
@@ -178,10 +168,12 @@ inline float aspect(T const & size) {
 #include "Config.h"
 
 // First order dependencies
+#include "Chess.h"
 #include "Colors.h"
 #include "Files.h"
 #include "Interaction.h"
 #include "Stacks.h"
+#include "Strings.h"
 #include "SocketClient.h"
 #include "GlDebug.h"
 
