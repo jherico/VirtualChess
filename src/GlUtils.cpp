@@ -30,9 +30,6 @@ Context & GlUtils::context() {
   static Context ctx;
   return ctx;
 }
-// This is a library for 3D mesh decompression
-//#include <openctmpp.h>
-
 
 // Some defines to make calculations below more transparent
 #define TRIANGLES_PER_FACE 2
@@ -327,5 +324,56 @@ void Geometry::loadMesh(const Mesh & mesh) {
       offset += (sizeof(GLfloat) * 4);
     }
     NoVertexArray().Bind();
+    NoBuffer().Bind(Buffer::Target::Array);
+    NoBuffer().Bind(Buffer::Target::ElementArray);
   }
+}
+
+
+Geometry & GlUtils::getGeometry(Resource resource) {
+  typedef std::shared_ptr<Geometry> GeometryPtr;
+  typedef std::map<Resource, GeometryPtr> Map;
+  static Map map;
+  if (!map.count(resource)) {
+    map[resource].reset(new Geometry());
+    Mesh mesh; {
+      CTMimporter importer;
+      importer.LoadData(Platform::getResourceString(resource));
+      int vertexCount = importer.GetInteger(CTM_VERTEX_COUNT);
+      mesh.positions.resize(vertexCount);
+      const float * ctmData = importer.GetFloatArray(CTM_VERTICES);
+      for (int i = 0; i < vertexCount; ++i) {
+        glm::vec4 pos(glm::make_vec3(ctmData + (i * 3)), 1);
+        pos = mesh.model.top() * pos;
+        pos /= pos.w;
+        mesh.positions[i] = vec4(glm::make_vec3(&pos.x), 1);
+      }
+
+      if (importer.GetInteger(CTM_UV_MAP_COUNT) > 0) {
+        const float * ctmData = importer.GetFloatArray(CTM_UV_MAP_1);
+        mesh.texCoords.resize(vertexCount);
+        for (int i = 0; i < vertexCount; ++i) {
+          mesh.texCoords[i] = glm::make_vec2(ctmData + (i * 2));
+        }
+      }
+
+      bool hasNormals = importer.GetInteger(CTM_HAS_NORMALS) ? true : false;
+      if (hasNormals) {
+        mesh.normals.resize(vertexCount);
+        ctmData = importer.GetFloatArray(CTM_NORMALS);
+        for (int i = 0; i < vertexCount; ++i) {
+          mesh.normals[i] = vec4(glm::make_vec3(ctmData + (i * 3)), 1);
+        }
+      }
+
+      int indexCount = 3 * importer.GetInteger(CTM_TRIANGLE_COUNT);
+      const CTMuint * ctmIntData = importer.GetIntegerArray(CTM_INDICES);
+      mesh.indices.resize(indexCount);
+      for (int i = 0; i < indexCount; ++i) {
+        mesh.indices[i] = *(ctmIntData + i);
+      }
+    }
+    map[resource]->loadMesh(mesh);
+  }
+  return (*map[resource]);
 }

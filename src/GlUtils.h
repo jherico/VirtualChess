@@ -24,30 +24,29 @@
 
 
 struct Light {
-  glm::vec4 position;
-  glm::vec4 color;
+  vec3 position;
+  vec4 color;
 
-  Light(const glm::vec4 & position = glm::vec4(1), const glm::vec4 & color =
-      glm::vec4(1)) {
+  Light(const vec3 & position = vec3(1), const vec4 & color = vec4(1)) {
     this->position = position;
     this->color = color;
   }
 };
 
 class Lights {
-  std::vector<glm::vec4> lightPositions;
-  std::vector<glm::vec4> lightColors;
-  glm::vec4 ambient;
-
 public:
+  std::vector<vec3> lightPositions;
+  std::vector<vec4> lightColors;
+  vec4 ambient;
+
   // Singleton class
   Lights()
       : ambient(glm::vec4(0.2, 0.2, 0.2, 1.0)) {
     addLight();
   }
 
-  void addLight(const glm::vec4 & position = glm::vec4(1),
-      const glm::vec4 & color = glm::vec4(1)) {
+  void addLight(const glm::vec3 & position = vec3(1),
+      const vec4 & color = glm::vec4(1)) {
     lightPositions.push_back(position);
     lightColors.push_back(color);
   }
@@ -78,9 +77,34 @@ namespace Layout {
     enum {
       Projection = 0,
       ModelView = 1,
+      NormalMatrix = 2,
+      Color = 4,
+      LightAmbient = 8,
+      LightCount = 9,
+      ForceAlpha = 10,
+      LightPosition = 16,
+      LightColor = 24,
     };
   }
 }
+
+#define SET_UNIFORM(p, u, t, v) \
+  oglplus::Uniform<t>(p, Layout::Uniform::u).Set(v)
+
+#define SET_PROJECTION(program) \
+  SET_UNIFORM(program, Projection, mat4, Stacks::projection().top())
+
+#define SET_MODELVIEW(program) \
+  SET_UNIFORM(program, ModelView, mat4, Stacks::modelview().top())
+
+#define SET_LIGHTS(program, lights) \
+  SET_UNIFORM(program, LightAmbient, vec4, lights.ambient); \
+  SET_UNIFORM(program, LightCount, int, lights.lightPositions.size()); \
+  for(size_t  i = 0; i < lights.lightPositions.size(); ++i) { \
+    SET_UNIFORM(program, LightPosition + i, vec3, lights.lightPositions[i]); \
+    SET_UNIFORM(program, LightColor + i, vec4, lights.lightColors[i]); \
+  }
+
 
 
 class Geometry {
@@ -134,6 +158,7 @@ public:
   static Geometry & getColorCubeGeometry();
   static Geometry & getChessBoardGeometry();
 
+  static Geometry & getGeometry(Resource resource);
   static void getCubeVertices(oglplus::Buffer & dest);
 
   static void getCubeIndices(oglplus::Buffer & dest);
