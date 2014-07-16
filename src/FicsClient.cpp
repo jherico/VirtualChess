@@ -531,6 +531,9 @@ namespace Fics {
           start = promptPos + PROMPT.size();
           promptPos = line.find(PROMPT, start);
         }
+        if (start == line.size()) {
+          return;
+        }
         lineCallback(line.substr(start));
       }
     }
