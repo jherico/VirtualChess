@@ -25,7 +25,7 @@
 #include <CoreGraphics/CGDisplayConfiguration.h>
 #endif
 
-void myGlDebugCallback(
+void  APIENTRY myGlDebugCallback(
     GLenum source,
     GLenum type,
     GLuint id,
