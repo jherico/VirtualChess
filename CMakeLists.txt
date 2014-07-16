@@ -106,9 +106,6 @@ link_directories(${Boost_LIBRARY_DIR})
 list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
 #message(FATAL_ERROR ${Boost_LIBRARIES})
 
-find_package(DirectX)
-link_directories(${DirectX_LIBRARY_PATHS})
-
 # Computer vision library with advanced image loading and manipulation 
 # functionality.  
 # OpenCV is OPTIONAL.  
