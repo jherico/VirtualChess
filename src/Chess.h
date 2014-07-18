@@ -31,6 +31,7 @@ namespace Chess {
   }
 
   enum Piece {
+      NP = 0x00,
       WP = 0x01,
       WR,
       WN,
@@ -47,11 +48,11 @@ namespace Chess {
   };
 
   struct Board {
-    uint8_t position[8][8];
-    static uint8_t STANDARD_BOARD[64];
+    Piece position[8][8];
+    static Piece STANDARD_BOARD[64];
 
     Board() {
-      memcpy(position, STANDARD_BOARD, 64);
+      memcpy(position, STANDARD_BOARD, 64 * sizeof(Piece));
     }
   };
 

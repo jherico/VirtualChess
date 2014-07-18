@@ -32,8 +32,7 @@ using namespace boost::filesystem;
 #define FILE_LOADING 1
 #endif
 
-
-const std::string & Resources::getResourcePath(Resource resource) {
+const std::string & getResourcePath(Resource resource) {
   typedef std::unordered_map<Resource, std::string> Map;
   static bool init = false;
   static Map resources;
@@ -46,11 +45,11 @@ const std::string & Resources::getResourcePath(Resource resource) {
     assert(mainBundle);
 #endif
 
-    while (RESOURCE_MAP_VALUES[i].first != NO_RESOURCE) {
-      Resource res = RESOURCE_MAP_VALUES[i].first;
-      std::string path = RESOURCE_MAP_VALUES[i].second;
+    while (Resources::RESOURCE_MAP_VALUES[i].first != NO_RESOURCE) {
+      Resource res = Resources::RESOURCE_MAP_VALUES[i].first;
+      std::string path = Resources::RESOURCE_MAP_VALUES[i].second;
 #if FILE_LOADING
-      path = RESOURCE_ROOT + "/" + path;
+      path = Resources::RESOURCE_ROOT + "/" + path;
 #elif defined(WIN32)
       // Win32 resource identifiers can't have spaces
       for (int j = 0; j < path.size(); ++j) {
@@ -74,6 +73,13 @@ const std::string & Resources::getResourcePath(Resource resource) {
   }
   return resources[resource];
 }
+
+void Resources::getResourcePath(Resource resource, char * out, size_t size) {
+  const std::string & path = ::getResourcePath(resource);
+  strcpy_s(out, size, path.c_str());
+}
+
+
 
 // Everything except for windows resources ultimately boils down to a file path
 // and file loading
@@ -133,7 +139,7 @@ std::string readFile(const std::string & filename) {
 }
 
 size_t Resources::getResourceSize(Resource resource) {
-  const std::string & filename = getResourcePath(resource);
+  const std::string & filename = ::getResourcePath(resource);
   struct stat st;
   if (0 == stat(filename.c_str(), &st))
     return st.st_size;
@@ -141,13 +147,13 @@ size_t Resources::getResourceSize(Resource resource) {
 }
 
 void Resources::getResourceData(Resource resource, void * out) {
-  const std::string & path = getResourcePath(resource);
+  const std::string & path = ::getResourcePath(resource);
   std::string data = readFile(path);
   memcpy(out, data.data(), data.length());
 }
 
 time_t Resources::getResourceModified(Resource resource) {
-  const std::string & filename = getResourcePath(resource);
+  const std::string & filename = ::getResourcePath(resource);
   struct stat st;
   if (0 == stat(filename.c_str(), &st))
     return st.st_mtime;

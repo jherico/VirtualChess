@@ -48,6 +48,13 @@ long Platform::elapsedMillis() {
 #endif
 }
 
+std::string Platform::getResourcePath(Resource resource) {
+  char path[MAX_PATH + 1];
+  Resources::getResourcePath(resource, path, MAX_PATH);
+  std::string result = path;
+  return result;
+}
+
 float Platform::elapsedSeconds() {
   return (float)elapsedMillis() / 1000.0f;
 }

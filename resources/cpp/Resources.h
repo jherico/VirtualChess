@@ -22,11 +22,12 @@ public:
   static Resources_EXPORT const Resource VERTEX_SHADERS[];
   static Resources_EXPORT const Resource FRAGMENT_SHADERS[];
   static Resources_EXPORT const Resource LIB_SHADERS[];
-  static Resources_EXPORT const std::string & getResourcePath(Resource resource);
+  static Resources_EXPORT void getResourcePath(Resource resource, char * out, size_t size);
   static Resources_EXPORT time_t getResourceModified(Resource resource);
   static Resources_EXPORT size_t getResourceSize(Resource resource);
   static Resources_EXPORT void getResourceData(Resource resource, void * out);
 private:
   static const std::string RESOURCE_ROOT;
   static const Pair RESOURCE_MAP_VALUES[];
+  friend const std::string & getResourcePath(Resource resource);
 };

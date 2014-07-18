@@ -1,12 +1,13 @@
 # Required for statically linking the MSVC runtime
-set(CMAKE_USER_MAKE_RULES_OVERRIDE
-   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_flag_overrides.cmake)
-set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
-   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_flag_overrides.cmake)
+#set(CMAKE_USER_MAKE_RULES_OVERRIDE
+#   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_flag_overrides.cmake)
+#set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
+#   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_flag_overrides.cmake)
 
 project(VirtualChess)
 cmake_minimum_required(VERSION 2.8)
 
+set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # First for the generic no-config case (e.g. with mingw)
@@ -90,6 +91,22 @@ add_subdirectory(libraries/OpenCTM)
 set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND PROJECT_LIBS OpenCTM)
+
+# Freetype
+add_subdirectory(libraries/freetype)
+include_directories(libraries/freetype/include)
+list(APPEND PROJECT_LIBS freetype)
+set_target_properties(freetype PROPERTIES FOLDER "3rdparty")
+
+set(FREETYPE_LIBRARY freetype)
+set(FREETYPE_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/libraries/freetype/include)
+add_subdirectory(libraries/rocket)
+set_target_properties(RocketCore PROPERTIES FOLDER "3rdparty")
+set_target_properties(RocketControls PROPERTIES FOLDER "3rdparty")
+set_target_properties(RocketDebugger PROPERTIES FOLDER "3rdparty")
+include_directories(libraries/rocket/Include)
+list(APPEND PROJECT_LIBS RocketCore RocketControls RocketDebugger)
+
 
 #add_subdirectory(libraries/sdl2)
 #include_directories(libraries/sdl2/include)

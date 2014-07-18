@@ -22,3 +22,9 @@
 [submodule "libraries/zlib"]
 	path = libraries/zlib
 	url = https://github.com/jherico/zlib
+[submodule "libraries/rocket"]
+	path = libraries/rocket
+	url = git@github.com:jherico/libRocket.git
+[submodule "libraries/freetype"]
+	path = libraries/freetype
+	url = git@github.com:jherico/freetype.git

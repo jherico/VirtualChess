@@ -288,7 +288,7 @@ namespace Fics {
     }
   }
 
-  int pieceFromChar(char c) {
+  Piece pieceFromChar(char c) {
     switch (c) {
     case 'p': return WP; 
     case 'r': return WR;
@@ -303,7 +303,7 @@ namespace Fics {
     case 'Q': return BQ;
     case 'K': return BK;
     }
-    return 0;
+    return NP;
   }
 
   void GameState::parseStyle12(const string & gameState) {
