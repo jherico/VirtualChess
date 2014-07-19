@@ -9,6 +9,7 @@ cmake_minimum_required(VERSION 2.8)
 
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include (cotire)
 
 # First for the generic no-config case (e.g. with mingw)
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
@@ -25,6 +26,7 @@ endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
 # Comment out to disable the debug build
 set(CMAKE_BUILD_TYPE DEBUG)
+set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_DEBUG_POSTFIX "d")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
@@ -100,7 +102,10 @@ set_target_properties(freetype PROPERTIES FOLDER "3rdparty")
 
 set(FREETYPE_LIBRARY freetype)
 set(FREETYPE_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/libraries/freetype/include)
+
+set(BUILD_SHARED_LIBS ON)
 add_subdirectory(libraries/rocket)
+set(BUILD_SHARED_LIBS OFF)
 set_target_properties(RocketCore PROPERTIES FOLDER "3rdparty")
 set_target_properties(RocketControls PROPERTIES FOLDER "3rdparty")
 set_target_properties(RocketDebugger PROPERTIES FOLDER "3rdparty")
@@ -114,21 +119,15 @@ list(APPEND PROJECT_LIBS RocketCore RocketControls RocketDebugger)
 #list(APPEND PROJECT_LIBS ${SDL2-LIB_DEPENDS})
 
 
-set(Boost_USE_STATIC_LIBS    ON)
+if (WIN32)
+    set(Boost_USE_STATIC_LIBS    ON)
+endif()
 set(Boost_USE_MULTITHREADED  ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 find_package(Boost COMPONENTS filesystem system thread)
 include_directories(${Boost_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIR})
 list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
-#message(FATAL_ERROR ${Boost_LIBRARIES})
-
-# Computer vision library with advanced image loading and manipulation 
-# functionality.  
-# OpenCV is OPTIONAL.  
-#find_package( OpenCV QUIET REQUIRED)
-#include_directories(${OpenCV_INCLUDE_DIRS})
-#list(APPEND PROJECT_LIBS ${OpenCV_LIBS})
 
 if((WIN32 OR APPLE))
     # zlib
@@ -149,9 +148,19 @@ if((WIN32 OR APPLE))
     set_target_properties(zlib PROPERTIES FOLDER "3rdparty")
     set_target_properties(png PROPERTIES FOLDER "3rdparty")
 else()
-    find_package(PNG REQUIRED)
+    find_package(PkgConfig)
+    pkg_check_modules(PNG REQUIRED png)
     include_directories(${PNG_INCLUDE_DIR})
-    list(APPEND PROJECT_LIBS ${PNG_LIBRARIES})
+    list(APPEND PROJECT_LIBS png)
+    
+    pkg_check_modules(SDL2 REQUIRED sdl2)
+    include_directories(${SDL2_INCLUDE_DIRS})
+    list(APPEND PROJECT_LIBS ${SDL2_LIBRARIES})
+
+    #get_cmake_property(_variableNames VARIABLES)
+    #foreach (_variableName ${_variableNames})
+    #    message(STATUS "${_variableName}=${${_variableName}}")
+    #endforeach()
 endif()
 
 

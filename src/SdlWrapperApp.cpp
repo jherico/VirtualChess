@@ -18,7 +18,21 @@
  ************************************************************************************/
 #include "Common.h"
 
-void  APIENTRY myGlDebugCallback(
+int getSdlDisplayAtPosition(const ivec2 & pos, uvec2 & displaySize) {
+  int numDisplays = SDL_GetNumVideoDisplays();
+  for (int i = 0; i < numDisplays; ++i) {
+    SDL_Rect bounds;
+    SDL_GetDisplayBounds(i, &bounds);
+    if (bounds.x == pos.x && bounds.y == pos.y) {
+      displaySize.x = bounds.w;
+      displaySize.y = bounds.h;
+      return i;
+    }
+  }
+  return -1;
+}
+
+void  myGlDebugCallback(
     GLenum source,
     GLenum type,
     GLuint id,

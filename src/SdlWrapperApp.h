@@ -19,7 +19,7 @@
 
 #pragma once
 
-void APIENTRY myGlDebugCallback(GLenum source,
+void myGlDebugCallback(GLenum source,
   GLenum type,
   GLuint id,
   GLenum severity,
@@ -27,6 +27,7 @@ void APIENTRY myGlDebugCallback(GLenum source,
   const GLchar * message,
   void * userParam);
 
+int getSdlDisplayAtPosition(const ivec2 & pos, uvec2 & displaySize);
 
 template <class T, class ARGS>
 class SdlWrapperApp {
@@ -84,17 +85,4 @@ public:
     GL_CHECK_ERROR;
   }
 
-  static int getSdlDisplayAtPosition(const ivec2 & pos, uvec2 & displaySize) {
-    int numDisplays = SDL_GetNumVideoDisplays();
-    for (int i = 0; i < numDisplays; ++i) {
-      SDL_Rect bounds;
-      SDL_GetDisplayBounds(i, &bounds);
-      if (bounds.x == pos.x && bounds.y == pos.y) {
-        displaySize.x = bounds.w;
-        displaySize.y = bounds.h;
-        return i;
-      }
-    }
-    return -1;
-  }
 };

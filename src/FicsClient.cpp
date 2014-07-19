@@ -290,7 +290,7 @@ namespace Fics {
 
   Piece pieceFromChar(char c) {
     switch (c) {
-    case 'p': return WP; 
+    case 'p': return WP;
     case 'r': return WR;
     case 'n': return WN;
     case 'b': return WB;
@@ -339,7 +339,7 @@ namespace Fics {
     buf >> castle;
     //can Black still castle long ?
     castling[Side::BLACK][CastlingDistance::LONG] = castle ? true : false;
-      
+
     //*the number of moves made since the last irreversible move.  (0 if last move
     //  was irreversible.If the value is >= 100, the game can be declared a draw
     //  due to the 50 move rule.)
@@ -402,7 +402,7 @@ namespace Fics {
     }
 
     void waitForIdle() {
-      while (IDLE != state && ERROR != state) {
+      while (IDLE != state && FAIL != state) {
         Platform::sleepMillis(500);
       }
     }
@@ -564,7 +564,6 @@ namespace Fics {
     return result;
   }
 
-
   class ClientImpl : public Client {
     boost::asio::io_service io_service;
     boost::asio::io_service::work work;
@@ -627,40 +626,6 @@ namespace Fics {
   ClientPtr Client::create() {
     return ClientPtr(new ClientImpl());
   }
-
-  class Test {
-  public:
-    int run() {
-      string gameListString = Platform::getResourceString(Resource::MISC_GAMELIST_TXT);
-      GameList gameList = GameSummary::parseList(gameListString);
-      /*
-      boost::asio::io_service io_service;
-      boost::asio::io_service::work work(io_service);
-      boost::thread serviceThread(boost::bind(&boost::asio::io_service::run, &io_service));
-      tcp::resolver resolver(io_service);
-      tcp::resolver::query query("freechess.org", "5000");
-      tcp::resolver::iterator iterator = resolver.resolve(query);
-
-      SocketClient client(io_service);
-      client.connect(iterator, "ariha", "borklu");
-      client.waitForIdle();
-      //string testGame("<12> r-bqk--r pppp-ppp -----n-- --b-P--- -------- --N----- PPP-PPPP R-BQKB-R W -1 1 1 1 1 1 8 GuestLYKS GuestGJWZ 0 5 5 36 35 209 289 6 B/f8-c5 (0:13) Bc5 0 1 0");
-      //GameState state;
-      //state.parseStyle12(testGame);
-      string gamesResult = client.command("games");
-      SAY(gamesResult.c_str());
-      SAY("=================");
-      string observeResult = client.command("observe 8");
-      SAY(observeResult.c_str());
-      SAY("=================");
-      while (1) {
-        Platform::sleepMillis(100);
-      }
-      */
-      return 0;
-    }
-  };
 }
 
-//RUN_APP(Fics::Test);
 

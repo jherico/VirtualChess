@@ -21,7 +21,7 @@ public:
 
   static void renderSkybox(Resource firstResource) {
     using namespace oglplus;
-    static Program prog = GlUtils::getProgram(
+    static Program & prog = GlUtils::getProgram(
         Resource::SHADERS_CUBEMAP_VS,
         Resource::SHADERS_CUBEMAP_FS);
 

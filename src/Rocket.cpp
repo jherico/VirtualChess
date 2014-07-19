@@ -3,6 +3,65 @@
 
 #include <Rocket/Core/FontDatabase.h>
 
+typedef std::shared_ptr<Rocket::Core::Context> RocketContextPtr;
+using namespace oglplus;
+
+struct RocketSurface {
+  RocketContextPtr ctx;
+  uvec2 size;
+  oglplus::Texture      tex;
+  oglplus::Framebuffer  fbo;
+private:
+  oglplus::Context gl;
+public:
+
+  RocketSurface(const uvec2 & size) : size(size) {
+    ctx.reset(Rocket::Core::CreateContext("main",
+      Rocket::Core::Vector2i(size.x, size.y)));
+
+    gl.Bound(Texture::Target::_2D, tex)
+      .MinFilter(TextureMinFilter::Linear)
+      .MagFilter(TextureMagFilter::Linear)
+      .WrapS(TextureWrap::ClampToEdge)
+      .WrapT(TextureWrap::ClampToEdge)
+      .Image2D(0, PixelDataInternalFormat::RGBA8,
+        size.x, size.y,
+        0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
+      );
+    gl.Bound(Framebuffer::Target::Draw, fbo)
+      .AttachTexture(FramebufferAttachment::Color, tex, 0)
+      .Complete();
+  }
+
+
+  void render() {
+    fbo.Bind(Framebuffer::Target::Draw);
+    gl.Viewport(size.x, size.y);
+    gl.Clear().ColorBuffer();
+    ctx->Update();
+    ctx->Render();
+    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+  }
+
+//  // Load and show the tutorial document.
+//  Rocket::Core::ElementDocument* document = ctx->LoadDocument("data/tutorial.rml");
+//  if (document != NULL) {
+//    document->Show();
+//    document->RemoveReference();
+//  }
+
+};
+
+
+using namespace oglplus;
+struct CompiledGeometry {
+  oglplus::VertexArray vao;
+  oglplus::Buffer buffer;
+  int count;
+  int vertexCount;
+  int indexOffset;
+  Rocket::Core::TextureHandle texture;
+};
 
 Resource FONT_NAMES[] = {
   Resource::FONTS_DELICIOUS_ROMAN_OTF,
@@ -46,7 +105,7 @@ RocketBridge::~RocketBridge() {
 Rocket::Core::FileHandle RocketBridge::Open(const Rocket::Core::String& path)
 {
   if (!path.Empty() && '+' == path[0]) {
-    Resource res = static_cast<Resource>(atoi(path.Substring(0).CString()));  
+    Resource res = static_cast<Resource>(atoi(path.Substring(0).CString()));
     return (Rocket::Core::FileHandle)new std::istringstream(Platform::getResourceString(res));
   } else {
     return (Rocket::Core::FileHandle)new std::ifstream(path.CString());
@@ -102,61 +161,117 @@ float RocketBridge::GetElapsedTime()
 }
 
 
-#define GL_CLAMP_TO_EDGE 0x812F
+
+static const size_t VERTEX_STRIDE = sizeof(Rocket::Core::Vertex);
+static const void* VERTEX_COLOR_OFFSET = (void*)offsetof(Rocket::Core::Vertex, colour);
+static const void* VERTEX_TEX_OFFSET = (void*)offsetof(Rocket::Core::Vertex, tex_coord);
+
+void compileGeometry(CompiledGeometry & cg,
+    BufferUsage usage,
+    Rocket::Core::Vertex* vertices,
+    int num_vertices,
+    int* indices,
+    int num_indices,
+    const Rocket::Core::TextureHandle texture
+) {
+  cg.texture = texture;
+  cg.count = num_indices;
+  cg.vertexCount = num_vertices;
+  cg.indexOffset = sizeof(Rocket::Core::Vertex) * num_vertices;
+  size_t bufferSize = cg.indexOffset + sizeof(int) * num_indices;
+
+  cg.buffer.Bind(Buffer::Target::Array);
+  Buffer::Data<void*>(Buffer::Target::Array, bufferSize, nullptr, usage);
+  Buffer::SubData(BufferTarget::Array, 0, num_vertices, vertices);
+  Buffer::SubData(BufferTarget::Array, cg.indexOffset, num_indices, indices);
+  glBufferSubData(GL_ARRAY_BUFFER, cg.indexOffset, sizeof(int) * num_indices, indices);
+  NoBuffer().Bind(Buffer::Target::Array);
+
+//  cg.vao.Bind();
+//  /// Two-dimensional position of the vertex (usually in pixels).
+//  Vector2f position;
+//  /// RGBA-ordered 8-bit / channel colour.
+//  Colourb colour;
+//  /// Texture coordinate for any associated texture.
+//  Vector2f tex_coord;
+//  VertexArrayAttrib(Layout::Attribute::POSITION).
+//    Pointer(2, DataType::Float, false, VERTEX_STRIDE, 0).
+//    Enable();
+//  VertexArrayAttrib(Layout::Attribute::COLOR).
+//    Pointer(4, DataType::Byte, false, VERTEX_STRIDE, VERTEX_COLOR_OFFSET).
+//    Enable();
+//  VertexArrayAttrib(Layout::Attribute::TEX_COORD).
+//    Pointer(2, DataType::Float, false, VERTEX_STRIDE, VERTEX_TEX_OFFSET).
+//    Enable();
+//  NoVertexArray().Bind();
+}
+
+
+//#define GL_CLAMP_TO_EDGE 0x812F
+
 
 // Called by Rocket when it wants to render geometry that it does not wish to optimise.
-void RocketBridge::RenderGeometry(Rocket::Core::Vertex* vertices, int ROCKET_UNUSED_PARAMETER(num_vertices), int* indices, int num_indices, const Rocket::Core::TextureHandle texture, const Rocket::Core::Vector2f& translation)
+void RocketBridge::RenderGeometry(
+    Rocket::Core::Vertex* vertices,
+    int num_vertices,
+    int* indices,
+    int num_indices,
+    const Rocket::Core::TextureHandle texture,
+    const Rocket::Core::Vector2f& translation)
 {
-    ROCKET_UNUSED(num_vertices);
-
-    glPushMatrix();
-    glTranslatef(translation.x, translation.y, 0);
-
-    glVertexPointer(2, GL_FLOAT, sizeof(Rocket::Core::Vertex), &vertices[0].position);
-    glEnableClientState(GL_COLOR_ARRAY);
-    glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(Rocket::Core::Vertex), &vertices[0].colour);
-
-    if (!texture)
-    {
-        glDisable(GL_TEXTURE_2D);
-        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    }
-    else
-    {
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, (GLuint) texture);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        glTexCoordPointer(2, GL_FLOAT, sizeof(Rocket::Core::Vertex), &vertices[0].tex_coord);
-    }
-
-    glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, indices);
-
-    glPopMatrix();
+  static CompiledGeometry cg;
+  Rocket::Core::Log::Message(Rocket::Core::Log::LT_ERROR, "Rendered Direct.");
+  compileGeometry(cg, BufferUsage::StreamDraw, vertices, num_vertices, indices, num_indices, texture);
+  RenderCompiledGeometry((Rocket::Core::CompiledGeometryHandle)&cg, translation);
 }
 
 // Called by Rocket when it wants to compile geometry it believes will be static for the forseeable future.
-Rocket::Core::CompiledGeometryHandle RocketBridge::CompileGeometry(Rocket::Core::Vertex* ROCKET_UNUSED_PARAMETER(vertices), int ROCKET_UNUSED_PARAMETER(num_vertices), int* ROCKET_UNUSED_PARAMETER(indices), int ROCKET_UNUSED_PARAMETER(num_indices), const Rocket::Core::TextureHandle ROCKET_UNUSED_PARAMETER(texture))
+Rocket::Core::CompiledGeometryHandle RocketBridge::CompileGeometry(
+    Rocket::Core::Vertex* vertices,
+    int num_vertices,
+    int* indices,
+    int num_indices,
+    const Rocket::Core::TextureHandle texture)
 {
-    ROCKET_UNUSED(vertices);
-    ROCKET_UNUSED(num_vertices);
-    ROCKET_UNUSED(indices);
-    ROCKET_UNUSED(num_indices);
-    ROCKET_UNUSED(texture);
-
-    return (Rocket::Core::CompiledGeometryHandle) NULL;
+  Rocket::Core::Log::Message(Rocket::Core::Log::LT_ERROR, "Compiled Geometry.");
+  CompiledGeometry * cg = new CompiledGeometry();
+  compileGeometry(*cg, BufferUsage::StaticDraw, vertices, num_vertices, indices, num_indices, texture);
+  return (Rocket::Core::CompiledGeometryHandle)cg;
 }
 
+
 // Called by Rocket when it wants to render application-compiled geometry.
-void RocketBridge::RenderCompiledGeometry(Rocket::Core::CompiledGeometryHandle ROCKET_UNUSED_PARAMETER(geometry), const Rocket::Core::Vector2f& ROCKET_UNUSED_PARAMETER(translation))
+void RocketBridge::RenderCompiledGeometry(Rocket::Core::CompiledGeometryHandle geometry, const Rocket::Core::Vector2f& translation)
 {
-    ROCKET_UNUSED(geometry);
-    ROCKET_UNUSED(translation);
+  CompiledGeometry & cg = *(CompiledGeometry*)geometry;
+  glPushMatrix();
+  glTranslatef(translation.x, translation.y, 0);
+//  cg.vao.Bind();
+  cg.buffer.Bind(Buffer::Target::Array);
+  cg.buffer.Bind(Buffer::Target::ElementArray);
+  glVertexPointer(2, GL_FLOAT, VERTEX_STRIDE, 0);
+  glEnableClientState(GL_COLOR_ARRAY);
+  glColorPointer(4, GL_UNSIGNED_BYTE, VERTEX_STRIDE, VERTEX_COLOR_OFFSET);
+  if (!cg.texture) {
+    glDisable(GL_TEXTURE_2D);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+  } else {
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, (GLuint) cg.texture);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glTexCoordPointer(2, GL_FLOAT, VERTEX_STRIDE, VERTEX_TEX_OFFSET);
+  }
+  glDrawElements(GL_TRIANGLES, cg.count, GL_UNSIGNED_INT, (void*)cg.indexOffset);
+  glPopMatrix();
+  NoBuffer().Bind(Buffer::Target::ElementArray);
+  NoBuffer().Bind(Buffer::Target::Array);
+//  NoVertexArray().Bind();
 }
 
 // Called by Rocket when it wants to release application-compiled geometry.
-void RocketBridge::ReleaseCompiledGeometry(Rocket::Core::CompiledGeometryHandle ROCKET_UNUSED_PARAMETER(geometry))
+void RocketBridge::ReleaseCompiledGeometry(Rocket::Core::CompiledGeometryHandle geometry)
 {
-    ROCKET_UNUSED(geometry);
+  delete (CompiledGeometry*)geometry;
 }
 
 // Called by Rocket when it wants to enable or disable scissoring to clip content.

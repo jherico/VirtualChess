@@ -34,19 +34,12 @@ Resource PIECE_RESOURCES[] = {
 static uvec2 UI_SIZE(1024, 768);
 
 
-typedef std::shared_ptr<Rocket::Core::Context> RocketContextPtr;
 class VirtualChess : public RiftApp {
   bool quit{ false };
   mat4 player;
-  Program prog;
   Fics::ClientPtr ficsClient;
   Lights lights;
   Chess::Board board;
-
-  RocketContextPtr rctx;
-  oglplus::Texture      rtex;
-  oglplus::Framebuffer  rfbo;
-
 
   static Geometry & getPieceGeometry(uint8_t piece) {
     int pieceShape = (piece - 1) & 0x0F;
@@ -58,31 +51,7 @@ public:
 
   VirtualChess(const RiftWrapperArgs & args) : RiftApp(args) {
     RocketBridge::init();
-    rctx.reset(Rocket::Core::CreateContext("main", 
-      Rocket::Core::Vector2i(UI_SIZE.x, UI_SIZE.y)));
-
-    // Load and show the tutorial document.
-    Rocket::Core::ElementDocument* document = rctx->LoadDocument("data/tutorial.rml");
-    if (document != NULL) {
-      document->Show();
-      document->RemoveReference();
-    }
-
-    gl.Bound(Texture::Target::_2D, rtex)
-      .MinFilter(TextureMinFilter::Linear)
-      .MagFilter(TextureMagFilter::Linear)
-      .WrapS(TextureWrap::ClampToEdge)
-      .WrapT(TextureWrap::ClampToEdge)
-      .Image2D(0, PixelDataInternalFormat::RGBA8,
-        UI_SIZE.x, UI_SIZE.y,
-        0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
-      );
-    gl.Bound(Framebuffer::Target::Draw, rfbo)
-      .AttachTexture(FramebufferAttachment::Color, rtex, 0)
-      .Complete();
-
     player = glm::inverse(glm::lookAt(vec3(0, 0.25, 0.35), vec3(0, 0.25, 0), vec3(0, 1, 0)));
-    prog = GlUtils::getProgram(Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     string username, password; {
       string homeDir = getenv("HOME");
       istringstream prefs(Files::read(homeDir + "/.ficsLogin"));
@@ -105,14 +74,6 @@ public:
   }
 
   void updateState() {
-    {
-      rfbo.Bind(oglplus::Framebuffer::Target::Draw);
-      gl.Viewport(UI_SIZE.x, UI_SIZE.y);
-      gl.Clear().ColorBuffer();
-      rctx->Update();
-      rctx->Render();
-      oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-    }
 
 
     SDL_Event event;
@@ -142,6 +103,8 @@ public:
 
 
   void renderBoard() {
+    Program & prog = GlUtils::getProgram(
+        Resource::SHADERS_LIT_VS, Resource::SHADERS_LITCOLORED_FS);
     prog.Use();
     SET_PROJECTION(prog);
     SET_MODELVIEW(prog);

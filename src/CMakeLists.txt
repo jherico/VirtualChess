@@ -1,12 +1,13 @@
-file(GLOB SOURCE_FILES *.cpp)
+file(GLOB_RECURSE SOURCE_FILES *.cpp)
 list(REMOVE_ITEM SOURCE_FILES Common.cpp)
-file(GLOB HEADER_FILES *.h )
+file(GLOB_RECURSE HEADER_FILES *.h )
 list(APPEND SOURCE_FILES ${HEADER_FILES})
 
 configure_file(Config.h.in Config.h)
 list(APPEND HEADER_FILES ${CMAKE_CURRENT_BINARY_DIR}/Config.h )
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/shell)
 
 set(EXECUTABLE VirtualChess)
 
@@ -48,3 +49,5 @@ else()
 endif()
 
 target_link_libraries(${EXECUTABLE} ${PROJECT_LIBS})
+set_target_properties(${EXECUTABLE} PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT "Common.h")
+cotire(${EXECUTABLE})

@@ -150,13 +150,15 @@ void setupSdlGlAttributes();
 
 template <class T>
 class RiftWrapperApp : public SdlWrapperApp<T, RiftWrapperArgs>, public RiftManagerApp {
+  typedef SdlWrapperApp<T, RiftWrapperArgs> Super;
   int hmdDisplay;
 
 public:
   RiftWrapperApp() {
     // Attempt to find the Rift monitor.
-    windowPosition = hmdDesktopPosition;
-    hmdDisplay = getSdlDisplayAtPosition(windowPosition, windowSize);
+    Super::windowPosition = hmdDesktopPosition;
+    hmdDisplay = getSdlDisplayAtPosition(
+        Super::windowPosition, Super::windowSize);
     if (-1 == hmdDisplay) {
       FAIL("No Rift display found.");
     }
@@ -175,15 +177,15 @@ public:
     RiftWrapperArgs result;
     result.hmd = hmd;
     result.hmdDesc = hmdDesc;
-    result.windowSize = windowSize;
+    result.windowSize = Super::windowSize;
     return result;
   }
 
   virtual SDL_Window * createWindow() {
     setupSdlGlAttributes();
     SDL_Window * result = SDL_CreateWindow("SDL",
-      windowPosition.x, windowPosition.y,
-      windowSize.x, windowSize.y,
+        Super::windowPosition.x, Super::windowPosition.y,
+        Super::windowSize.x, Super::windowSize.y,
       SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN);
     return result;
   }

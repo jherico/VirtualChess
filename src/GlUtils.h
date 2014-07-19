@@ -151,7 +151,7 @@ public:
   static oglplus::Texture & getCubemapTexture(
     Resource resource);
 
-  static oglplus::Program getProgram(
+  static oglplus::Program & getProgram(
     Resource vertexResource,
     Resource fragmentResource);
 

@@ -76,7 +76,12 @@ const std::string & getResourcePath(Resource resource) {
 
 void Resources::getResourcePath(Resource resource, char * out, size_t size) {
   const std::string & path = ::getResourcePath(resource);
+#ifdef WIN32
   strcpy_s(out, size, path.c_str());
+#else
+  strcpy(out, path.c_str());
+#endif
+
 }
 
 

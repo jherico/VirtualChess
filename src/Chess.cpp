@@ -1,3 +1,4 @@
+#include "Common.h"
 
 namespace Chess {
   Piece Board::STANDARD_BOARD[64] = {

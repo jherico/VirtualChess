@@ -106,7 +106,7 @@ template <class T>
 void compileShaders(const Resource * shaders) {
   int i = 0;
   while (shaders[i] != Resource::NO_RESOURCE) {
-    SAY("Compiling %s", Resources::getResourcePath(shaders[i]).c_str());
+    SAY("Compiling %s", Platform::getResourcePath(shaders[i]).c_str());
     T shader;
     shader.Source(Platform::getResourceString(shaders[i]));
     shader.Compile();
@@ -114,27 +114,35 @@ void compileShaders(const Resource * shaders) {
   }
 }
 
-Program GlUtils::getProgram(Resource vsRes, Resource fsRes) {
+Program & GlUtils::getProgram(Resource vsRes, Resource fsRes) {
   static bool shadersChecked = false;
   if (!shadersChecked) {
     shadersChecked = true;
     //compileShaders<VertexShader>(Resources::VERTEX_SHADERS);
     //compileShaders<FragmentShader>(Resources::FRAGMENT_SHADERS);
   }
+  typedef std::pair<Resource, Resource> ProgramId;
+  typedef std::shared_ptr<Program> ProgramPtr;
+  typedef std::map<ProgramId, ProgramPtr> Map;
+  typedef Map::iterator MapItr;
+  static Map programs;
+  ProgramId key(vsRes, fsRes);
+  if (0 == programs.count(key)) {
+    VertexShader vs;
+    vs.Source(Platform::getResourceString(vsRes)).Compile();
+    FragmentShader fs;
+    fs.Source(Platform::getResourceString(fsRes)).Compile();
 
-  VertexShader vs;
-  vs.Source(Platform::getResourceString(vsRes)).Compile();
-  FragmentShader fs;
-  fs.Source(Platform::getResourceString(fsRes)).Compile();
+    ProgramPtr prog(new Program());
+    // attach the shaders to the program
+    prog->AttachShader(vs);
+    prog->AttachShader(fs);
+    // link and use it
+    prog->Link();
+    programs[key] = prog;
+  }
+  return *(programs[key]);
 
-  Program prog;
-  // attach the shaders to the program
-  prog.AttachShader(vs);
-  prog.AttachShader(fs);
-
-  // link and use it
-  prog.Link();
-  return prog;
 }
 
 images::PNGImage getResourceImage(Resource res) {

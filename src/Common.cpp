@@ -48,6 +48,10 @@ long Platform::elapsedMillis() {
 #endif
 }
 
+#ifndef WIN32
+#define MAX_PATH 4096
+#endif
+
 std::string Platform::getResourcePath(Resource resource) {
   char path[MAX_PATH + 1];
   Resources::getResourcePath(resource, path, MAX_PATH);
