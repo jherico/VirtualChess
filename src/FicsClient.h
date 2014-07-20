@@ -20,7 +20,7 @@ namespace Fics {
 
   // http://www.freechess.org/Help/HelpFiles/games.html
   struct GameSummary;
-  typedef std::list<GameSummary> GameList;
+  typedef std::vector<GameSummary> GameList;
 
   struct GameSummary : public GameBase {
     int     ratings[2];
@@ -32,7 +32,8 @@ namespace Fics {
     static GameList parseList(const std::string & listString);
   };
 
-  typedef std::list<GameSummary> GameList;
+  typedef std::vector<GameSummary> GameList;
+  typedef std::shared_ptr<GameList> GameListPtr;
 
   // http://www.freechess.org/Help/HelpFiles/style12.html
   struct GameState : public GameBase {
@@ -62,20 +63,67 @@ namespace Fics {
     void parseStyle12(const std::string & gameState);
   };
 
+  typedef std::shared_ptr<GameState> GameStatePtr;
   class Client;
   typedef std::shared_ptr<Client> ClientPtr;
+
+  namespace EventType {
+    enum {
+      NETWORK,
+      GAME_STATE,
+      GAME_LIST,
+      CHAT,
+      FICS_ERROR,
+    };
+  }
+  
+  struct EventGameState {
+    uint32_t        type;
+    GameState*      state;
+  };
+
+  struct EventChat {
+    uint32_t        type;
+    std::string     message;
+  };
+
+  struct EventPlayerList {
+    uint32_t        type;
+  };
+
+  struct EventGameList {
+    uint32_t        type;
+    GameList*       list;
+  };
+
+  struct EventNetwork {
+    uint32_t        type;
+    bool            connected;
+  };
+
+  typedef union Event
+  {
+    uint32_t        type;
+    EventGameState  gameState;
+    EventPlayerList playerList;
+    EventGameList   gameList;
+    EventNetwork    network;
+  } Event;
 
   class Client {
   protected:
     Client() { }
     virtual ~Client() { }
+    boost::function<void(const Event&)> callback;
 
   public:
     static ClientPtr create();
     virtual void connect(const std::string & username, const std::string & passwword) = 0;
-    virtual GameList games() = 0;
-    virtual bool observe(int id) = 0;
-    virtual void setGameCallback(boost::function<void(const GameState&)> callback) = 0;
+    virtual void listGames() = 0;
+    virtual void observeGame(int id) = 0;
+    virtual void setEventHandler(boost::function<void(const Event&)> callback) {
+      this->callback = callback;
+    }
   };
 
 

@@ -49,5 +49,5 @@ else()
 endif()
 
 target_link_libraries(${EXECUTABLE} ${PROJECT_LIBS})
-set_target_properties(${EXECUTABLE} PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT "Common.h")
-cotire(${EXECUTABLE})
+#set_target_properties(${EXECUTABLE} PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT "Common.h")
+#cotire(${EXECUTABLE})

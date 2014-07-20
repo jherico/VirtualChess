@@ -151,6 +151,14 @@ public:
     fillColors();
   }
 
+  void addTexturedQuad(float width, float height) {
+    addQuad(width, height);
+    texCoords.push_back(vec2(0, 0));
+    texCoords.push_back(vec2(1, 0));
+    texCoords.push_back(vec2(1, 1));
+    texCoords.push_back(vec2(0, 1));
+  }
+
   void addQuad(const vec2 & size) {
     addQuad(size.x, size.y);
   }

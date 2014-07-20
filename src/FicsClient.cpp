@@ -235,13 +235,6 @@ namespace Fics {
       "iset block 1\n"
       "1 iset lock 1\n";
 
-  struct Command {
-    int code;
-    string result;
-    boost::condition_variable condition;
-    boost::mutex mutex;
-  };
-
 
 
   //------------------------------------------------------------------------------
@@ -263,7 +256,8 @@ namespace Fics {
       buf >> str;
       if (string("++++") == str) {
         ratings[side] = -1;
-      } else {
+      }
+      else {
         ratings[side] = atoi(str.c_str());
       }
       buf >> str;
@@ -286,6 +280,31 @@ namespace Fics {
     case 'S': type = GameType::SUICIDE; break;
     case 'n': type = GameType::NON_STANDARD; break;
     }
+  }
+
+  vector<string> parseFicsLines(const std::string lines) {
+    string lineEndings = (0 == lines.find("\r\n") ? "\r\n" : "\n\r");
+    return Strings::split(Strings::replaceAll(lines, lineEndings, "\n"), '\n');
+  }
+
+  GameList GameSummary::parseList(const std::string & gameListString) {
+    GameList result;
+    vector<string> lines = parseFicsLines(gameListString);
+    for_each(lines.begin(), lines.end(), [&](vector<string>::const_reference s){
+      if (s.empty()) {
+        return;
+      }
+      if (string::npos != s.find("(Exam.")) {
+        return;
+      }
+      if (0 == s.find("  ")) {
+        return;
+      }
+      GameSummary summary;
+      summary.parse(s);
+      result.push_back(summary);
+    });
+    return result;
   }
 
   Piece pieceFromChar(char c) {
@@ -377,34 +396,34 @@ namespace Fics {
     buf >> c;
   }
 
-  /**
+  struct Command {
+    int code;
+    string result;
+    boost::function<void(const std::string &)> handler;
+    boost::condition_variable condition;
+    boost::mutex mutex;
+  };
 
-  */
-  class SocketClient : public ::SocketClient {
-    typedef std::shared_ptr<Command> CommandPtr;
-    typedef map<int, CommandPtr> CommandMap;
-    friend class ClientImpl;
-
+  class ClientImpl : public SocketClient, public Client {
+    boost::asio::io_service io_service;
     string readBuffer;
     string username, password;
-    CommandMap commandMap;
-    boost::mutex commandMapLock;
     int commandId{10};
-    boost::function<void(const string &)> lineCallback;
-  public:
+
     enum State {
       CONNECT, WAIT_LOGIN, WAIT_PASSWORD, LOGGED_IN, INTERFACE_SETUP, IDLE, FAIL
     };
 
     State state { WAIT_LOGIN };
+  
+  public:
+    
 
-    SocketClient(boost::asio::io_service& io_service) : ::SocketClient(io_service) {
+    ClientImpl() {
     }
 
-    void waitForIdle() {
-      while (IDLE != state && FAIL != state) {
-        Platform::sleepMillis(500);
-      }
+    virtual ~ClientImpl() {
+      close(); // close the telnet client connection
     }
 
     void connect(tcp::resolver::iterator & endpoint_iterator, const std::string & username, const std::string & password) {
@@ -413,27 +432,8 @@ namespace Fics {
       ::SocketClient::connect(endpoint_iterator);
     }
 
-    string command(const string & commandString) {
-      int id = commandId++;
-
-      commandMap[id].reset(new Command());
-      Command & c = *(commandMap[id]);
-
-      // Write the command
-      write(Platform::format("%d %s\n", id, commandString.c_str()));
-
-      // Wait for the response
-      withScopedLock(c.mutex, [&](boost::mutex::scoped_lock & lock){
-        c.condition.wait(lock);
-      });
-
-      // Extract the result
-      string result = c.result;
-      commandMap.erase(id);
-      if (commandMap.empty()) {
-        commandId = 10;
-      }
-      return result;
+    void command(const string & commandString) {
+      write(Platform::format("%d %s\n", commandId++, commandString.c_str()));
     }
 
   protected:
@@ -461,7 +461,17 @@ namespace Fics {
 
       case LOGGED_IN:
         write(INTERFACE_MACRO);
+        state = INTERFACE_SETUP;
+        break;
+
+      case INTERFACE_SETUP:
         state = IDLE;
+        if (callback) {
+          Event ev;
+          ev.type = EventType::NETWORK;
+          ev.network.connected = true;
+          callback(ev);
+        }
         break;
 
       case IDLE:
@@ -504,123 +514,69 @@ namespace Fics {
       }
     }
 
-
     void parseCommand(const string & command) {
       int idSep = command.find(BlockDelimiter::BLOCK_SEPARATOR);
-      int codeSep = command.find(BlockDelimiter::BLOCK_SEPARATOR, idSep + 1);
+      int commandId = atoi(command.substr(0, idSep++).c_str());
+      int codeSep = command.find(BlockDelimiter::BLOCK_SEPARATOR, idSep);
+      int commandCode = atoi(command.substr(idSep, codeSep++ - idSep).c_str());
+      string commandResult = command.substr(codeSep);
+      switch (commandCode) {
+      case BlockCode::BLK_ISET:
+        return;
 
-      commandId = atoi(command.substr(0, idSep++).c_str());
-      if (commandMap.count(commandId)) {
-        Command & c = *(commandMap[commandId]);
-        c.code = atoi(command.substr(idSep, codeSep++ - idSep).c_str());
-        c.result = command.substr(codeSep);
-        withScopedLock(c.mutex, [&](boost::mutex::scoped_lock & lock){
-          c.condition.notify_one();
-        });
-      } else {
-        SAY("Unrequested command %d result: ", commandId);
-        SAY(command.substr(codeSep).c_str());
-        SAY("=================");
+      case BlockCode::BLK_GAMES: 
+        if (callback) {
+          Event ev;
+          GameListPtr games(new GameList()); 
+          games->swap(GameSummary::parseList(commandResult));
+          ev.type = EventType::GAME_LIST;
+          ev.gameList.list = games.get();
+          callback(ev);
+        } return;
+        
+
       }
+      // TODO send a notification
     }
 
-    void parseLine(const string & line) {
-      if (lineCallback) {
-        int start = 0, promptPos = line.find(PROMPT);
+    void parseLine(const string & rawline) {
+      if (callback) {
+        int start = 0, promptPos = rawline.find(PROMPT);
         while (string::npos != promptPos) {
           start = promptPos + PROMPT.size();
-          promptPos = line.find(PROMPT, start);
+          promptPos = rawline.find(PROMPT, start);
         }
-        if (start == line.size()) {
+        if (start == rawline.size()) {
           return;
         }
-        lineCallback(line.substr(start));
+        std::string line = rawline.substr(start);
+        Event ev;
+        if (0 == line.find("<12> ")) {
+          GameStatePtr ptr(new GameState(line));
+          ev.gameState.type = EventType::GAME_STATE;
+          ev.gameState.state = ptr.get();
+          callback(ev);
+        }
+        else {
+          SAY(line.c_str());
+        }
       }
-    }
-  };
-
-  vector<string> parseFicsLines(const std::string lines) {
-    string lineEndings = (0 == lines.find("\r\n") ? "\r\n" : "\n\r");
-    return Strings::split(Strings::replaceAll(lines, lineEndings, "\n"), '\n');
-  }
-
-  GameList GameSummary::parseList(const std::string & gameListString) {
-    GameList result;
-    vector<string> lines = parseFicsLines(gameListString);
-    for_each(lines.begin(), lines.end(), [&](vector<string>::const_reference s){
-      if (s.empty()) {
-        return;
-      }
-      if (string::npos != s.find("(Exam.")) {
-        return;
-      }
-      if (0 == s.find("  ")) {
-        return;
-      }
-      GameSummary summary;
-      summary.parse(s);
-      result.push_back(summary);
-    });
-    return result;
-  }
-
-  class ClientImpl : public Client {
-    boost::asio::io_service io_service;
-    boost::asio::io_service::work work;
-    boost::thread serviceThread;
-    SocketClient client;
-    boost::function<void(const GameState&)> gameStateCallback;
-
-    void onLine(const std::string & line) {
-      if (gameStateCallback && 0 == line.find("<12> ")) {
-          gameStateCallback(GameState(line));
-      } else {
-        SAY(line.c_str());
-      }
-    }
-
-  public:
-    ClientImpl() : client(io_service), work(io_service),
-      serviceThread(boost::bind(&boost::asio::io_service::run, &io_service)) {
-      client.lineCallback = boost::bind(&ClientImpl::onLine, this, _1);
-    }
-
-    virtual ~ClientImpl() {
-      client.close(); // close the telnet client connection
-      serviceThread.join(); // wait for the IO service thread to close
     }
 
     virtual void connect(const std::string & username, const std::string & password) {
       tcp::resolver resolver(io_service);
       tcp::resolver::query query("freechess.org", "5000");
       tcp::resolver::iterator iterator = resolver.resolve(query);
-      client.connect(iterator, username, password);
-      client.waitForIdle();
+      connect(iterator, username, password);
     }
 
-    virtual GameList games() {
-      string gamesResult = client.command("games");
-      return GameSummary::parseList(gamesResult);
+    virtual void listGames() {
+      command("games");
     }
 
-    virtual bool observe(int id) {
-      string observeResult = client.command(Platform::format("observe %d", id));
-      vector<string> lines = parseFicsLines(observeResult);
-      for (int i = 0; i < lines.size(); ++i) {
-        if (0 == lines[i].find("<12> ")) {
-          if (gameStateCallback) {
-            gameStateCallback(GameState(lines[i]));
-          }
-          return true;
-        }
-      }
-      return false;
+    virtual void observeGame(int id) {
+      command(Platform::format("observe %d", id));
     }
-
-    virtual void setGameCallback(boost::function<void(const GameState&)> callback) {
-      gameStateCallback = callback;
-    }
-
   };
 
   ClientPtr Client::create() {

@@ -3,77 +3,73 @@
 
 #include <Rocket/Core/FontDatabase.h>
 
-typedef std::shared_ptr<Rocket::Core::Context> RocketContextPtr;
 using namespace oglplus;
-
-struct RocketSurface {
-  RocketContextPtr ctx;
-  uvec2 size;
-  oglplus::Texture      tex;
-  oglplus::Framebuffer  fbo;
-private:
-  oglplus::Context gl;
-public:
-
-  RocketSurface(const uvec2 & size) : size(size) {
-    ctx.reset(Rocket::Core::CreateContext("main",
-      Rocket::Core::Vector2i(size.x, size.y)));
-
-    gl.Bound(Texture::Target::_2D, tex)
-      .MinFilter(TextureMinFilter::Linear)
-      .MagFilter(TextureMagFilter::Linear)
-      .WrapS(TextureWrap::ClampToEdge)
-      .WrapT(TextureWrap::ClampToEdge)
-      .Image2D(0, PixelDataInternalFormat::RGBA8,
-        size.x, size.y,
-        0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
-      );
-    gl.Bound(Framebuffer::Target::Draw, fbo)
-      .AttachTexture(FramebufferAttachment::Color, tex, 0)
-      .Complete();
-  }
-
-
-  void render() {
-    fbo.Bind(Framebuffer::Target::Draw);
-    gl.Viewport(size.x, size.y);
-    gl.Clear().ColorBuffer();
-    ctx->Update();
-    ctx->Render();
-    DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
-  }
-
-//  // Load and show the tutorial document.
-//  Rocket::Core::ElementDocument* document = ctx->LoadDocument("data/tutorial.rml");
-//  if (document != NULL) {
-//    document->Show();
-//    document->RemoveReference();
-//  }
-
-};
 
 
 using namespace oglplus;
 struct CompiledGeometry {
   oglplus::VertexArray vao;
   oglplus::Buffer buffer;
+  oglplus::Buffer indexBuffer;
   int count;
-  int vertexCount;
-  int indexOffset;
   Rocket::Core::TextureHandle texture;
 };
 
 Resource FONT_NAMES[] = {
   Resource::FONTS_DELICIOUS_ROMAN_OTF,
-  Resource::FONTS_DELICIOUS_ITALIC_OTF,
   Resource::FONTS_DELICIOUS_BOLD_OTF,
-  Resource::FONTS_DELICIOUS_BOLDITALIC_OTF
+  Resource::FONTS_DELICIOUS_ITALIC_OTF,
+  Resource::FONTS_DELICIOUS_BOLDITALIC_OTF,
+  Resource::FONTS_BITWISE_OTF,
+  Resource::FONTS_MODER_DOS_437_OTF,
 };
 
 static std::shared_ptr<RocketBridge> INSTANCE;
 
+RocketSurface::RocketSurface(const uvec2 & size) : size(size) {
+  RocketBridge::init();
+
+  ctx.reset(Rocket::Core::CreateContext("main",
+    Rocket::Core::Vector2i(size.x, size.y)));
+  Rocket::Debugger::Initialise(ctx.get());
+
+  using namespace oglplus;
+  gl.Bound(Texture::Target::_2D, tex)
+    .MinFilter(TextureMinFilter::Linear)
+    .MagFilter(TextureMagFilter::Linear)
+    .WrapS(TextureWrap::ClampToEdge)
+    .WrapT(TextureWrap::ClampToEdge)
+    .Image2D(0, PixelDataInternalFormat::RGBA8,
+    size.x, size.y,
+    0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr
+    );
+  gl.Bound(Framebuffer::Target::Draw, fbo)
+    .AttachTexture(FramebufferAttachment::Color, tex, 0)
+    .Complete();
+}
+
+
+void RocketSurface::render() {
+  using namespace oglplus;
+  fbo.Bind(Framebuffer::Target::Draw);
+  gl.ClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+  gl.Clear().ColorBuffer();
+  gl.Viewport(size.x, size.y);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  Stacks::withPush([&]{
+    MatrixStack & pr = Stacks::projection();
+    pr.top() = glm::ortho((float)0, (float)size.x, (float)size.y, (float)0);
+    ctx->Update();
+    ctx->Render();
+  });
+  DefaultFramebuffer().Bind(Framebuffer::Target::Draw);
+}
+
 void RocketBridge::init() {
-  INSTANCE.reset(new RocketBridge());
+  if (nullptr == INSTANCE) {
+    INSTANCE.reset(new RocketBridge());
+  }
 }
 
 void RocketBridge::shutdown() {
@@ -86,9 +82,10 @@ RocketBridge::RocketBridge() {
   Rocket::Core::SetFileInterface(this);
   Rocket::Core::SetRenderInterface(this);
   Rocket::Core::Initialise();
+  Rocket::Controls::Initialise();
+  
 
-  Rocket::Core::String font_names[4];
-  for (int i = 0; i < sizeof(font_names) / sizeof(Rocket::Core::String); i++) {
+  for (int i = 0; i < sizeof(FONT_NAMES) / sizeof(Resource); i++) {
     std::string fontPath = Platform::format("+%d", FONT_NAMES[i]);
     Rocket::Core::FontDatabase::LoadFontFace(fontPath.c_str());
   }
@@ -166,6 +163,10 @@ static const size_t VERTEX_STRIDE = sizeof(Rocket::Core::Vertex);
 static const void* VERTEX_COLOR_OFFSET = (void*)offsetof(Rocket::Core::Vertex, colour);
 static const void* VERTEX_TEX_OFFSET = (void*)offsetof(Rocket::Core::Vertex, tex_coord);
 
+//static const size_t VERTEX_STRIDE = sizeof(vec4) * 3;
+//static const void* VERTEX_COLOR_OFFSET = (void*)sizeof(vec4);
+//static const void* VERTEX_TEX_OFFSET = (void*)(sizeof(vec4) * 2);
+
 void compileGeometry(CompiledGeometry & cg,
     BufferUsage usage,
     Rocket::Core::Vertex* vertices,
@@ -176,34 +177,26 @@ void compileGeometry(CompiledGeometry & cg,
 ) {
   cg.texture = texture;
   cg.count = num_indices;
-  cg.vertexCount = num_vertices;
-  cg.indexOffset = sizeof(Rocket::Core::Vertex) * num_vertices;
-  size_t bufferSize = cg.indexOffset + sizeof(int) * num_indices;
 
   cg.buffer.Bind(Buffer::Target::Array);
-  Buffer::Data<void*>(Buffer::Target::Array, bufferSize, nullptr, usage);
-  Buffer::SubData(BufferTarget::Array, 0, num_vertices, vertices);
-  Buffer::SubData(BufferTarget::Array, cg.indexOffset, num_indices, indices);
-  glBufferSubData(GL_ARRAY_BUFFER, cg.indexOffset, sizeof(int) * num_indices, indices);
-  NoBuffer().Bind(Buffer::Target::Array);
+  //Buffer::Data(Buffer::Target::Array, num_vertices, &data[0], usage);
+  Buffer::Data(Buffer::Target::Array, num_vertices, vertices, usage);
+  cg.indexBuffer.Bind(Buffer::Target::ElementArray);
+  Buffer::Data(Buffer::Target::ElementArray, num_indices, indices, usage);
 
-//  cg.vao.Bind();
-//  /// Two-dimensional position of the vertex (usually in pixels).
-//  Vector2f position;
-//  /// RGBA-ordered 8-bit / channel colour.
-//  Colourb colour;
-//  /// Texture coordinate for any associated texture.
-//  Vector2f tex_coord;
-//  VertexArrayAttrib(Layout::Attribute::POSITION).
-//    Pointer(2, DataType::Float, false, VERTEX_STRIDE, 0).
-//    Enable();
-//  VertexArrayAttrib(Layout::Attribute::COLOR).
-//    Pointer(4, DataType::Byte, false, VERTEX_STRIDE, VERTEX_COLOR_OFFSET).
-//    Enable();
-//  VertexArrayAttrib(Layout::Attribute::TEX_COORD).
-//    Pointer(2, DataType::Float, false, VERTEX_STRIDE, VERTEX_TEX_OFFSET).
-//    Enable();
-//  NoVertexArray().Bind();
+  cg.vao.Bind();
+  VertexArrayAttrib(Layout::Attribute::Position).
+    Pointer(2, DataType::Float, false, VERTEX_STRIDE, 0).
+    Enable();
+  VertexArrayAttrib(Layout::Attribute::Color).
+    Pointer(4, DataType::Byte, false, VERTEX_STRIDE, VERTEX_COLOR_OFFSET).
+    Enable();
+  VertexArrayAttrib(Layout::Attribute::TexCoord0).
+    Pointer(2, DataType::Float, false, VERTEX_STRIDE, VERTEX_TEX_OFFSET).
+    Enable();
+  NoVertexArray().Bind();
+  NoBuffer().Bind(Buffer::Target::Array);
+  NoBuffer().Bind(Buffer::Target::ElementArray);
 }
 
 
@@ -233,7 +226,7 @@ Rocket::Core::CompiledGeometryHandle RocketBridge::CompileGeometry(
     int num_indices,
     const Rocket::Core::TextureHandle texture)
 {
-  Rocket::Core::Log::Message(Rocket::Core::Log::LT_ERROR, "Compiled Geometry.");
+//  Rocket::Core::Log::Message(Rocket::Core::Log::LT_ERROR, "Compiled Geometry.");
   CompiledGeometry * cg = new CompiledGeometry();
   compileGeometry(*cg, BufferUsage::StaticDraw, vertices, num_vertices, indices, num_indices, texture);
   return (Rocket::Core::CompiledGeometryHandle)cg;
@@ -244,28 +237,30 @@ Rocket::Core::CompiledGeometryHandle RocketBridge::CompileGeometry(
 void RocketBridge::RenderCompiledGeometry(Rocket::Core::CompiledGeometryHandle geometry, const Rocket::Core::Vector2f& translation)
 {
   CompiledGeometry & cg = *(CompiledGeometry*)geometry;
-  glPushMatrix();
-  glTranslatef(translation.x, translation.y, 0);
-//  cg.vao.Bind();
-  cg.buffer.Bind(Buffer::Target::Array);
-  cg.buffer.Bind(Buffer::Target::ElementArray);
-  glVertexPointer(2, GL_FLOAT, VERTEX_STRIDE, 0);
-  glEnableClientState(GL_COLOR_ARRAY);
-  glColorPointer(4, GL_UNSIGNED_BYTE, VERTEX_STRIDE, VERTEX_COLOR_OFFSET);
-  if (!cg.texture) {
-    glDisable(GL_TEXTURE_2D);
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-  } else {
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, (GLuint) cg.texture);
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    glTexCoordPointer(2, GL_FLOAT, VERTEX_STRIDE, VERTEX_TEX_OFFSET);
+  Program & prog = GlUtils::getProgram(
+    cg.texture ? Resource::SHADERS_TEXTURED_VS : Resource::SHADERS_COLORED_VS,
+    cg.texture ? Resource::SHADERS_TEXTURED_FS : Resource::SHADERS_COLORED_FS
+  );
+  prog.Use();
+  Stacks::withPush([&]{
+    MatrixStack & mv = Stacks::modelview();
+    mv.identity();
+    mv.translate(vec3(translation.x, translation.y, 0));
+    SET_MODELVIEW(prog);
+    SET_PROJECTION(prog);
+  });
+  cg.vao.Bind();
+  cg.indexBuffer.Bind(Buffer::Target::ElementArray);
+  if (cg.texture) {
+    glBindTexture(GL_TEXTURE_2D, cg.texture);
   }
-  glDrawElements(GL_TRIANGLES, cg.count, GL_UNSIGNED_INT, (void*)cg.indexOffset);
-  glPopMatrix();
+  glDrawElements(GL_TRIANGLES, cg.count, GL_UNSIGNED_INT, 0);
+  if (cg.texture) {
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
+  NoVertexArray().Bind();
   NoBuffer().Bind(Buffer::Target::ElementArray);
-  NoBuffer().Bind(Buffer::Target::Array);
-//  NoVertexArray().Bind();
+  NoProgram().Use();
 }
 
 // Called by Rocket when it wants to release application-compiled geometry.
@@ -356,9 +351,12 @@ bool RocketBridge::LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rock
         long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
         for (long x = 0; x < header.width; x++)
         {
-            image_dest[write_index] = image_src[read_index+2];
-            image_dest[write_index+1] = image_src[read_index+1];
-            image_dest[write_index+2] = image_src[read_index];
+          image_dest[write_index] = image_src[read_index + 2];
+          image_dest[write_index + 1] = image_src[read_index+1];
+          image_dest[write_index + 2] = image_src[read_index];
+          //image_dest[write_index] = x % 2 ? 255 : 0;// image_src[read_index + 2];
+          //image_dest[write_index + 1] = y % 2 ? 255 : 0; //image_src[read_index+1];
+          //image_dest[write_index + 2] = 0; // image_src[read_index];
             if (color_mode == 4)
                 image_dest[write_index+3] = image_src[read_index+3];
             else
@@ -401,6 +399,7 @@ bool RocketBridge::GenerateTexture(Rocket::Core::TextureHandle& texture_handle, 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     texture_handle = (Rocket::Core::TextureHandle) texture_id;
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     return true;
 }
@@ -411,4 +410,378 @@ void RocketBridge::ReleaseTexture(Rocket::Core::TextureHandle texture_handle)
     glDeleteTextures(1, (GLuint*) &texture_handle);
 }
 
+Rocket::Core::Input::KeyIdentifier RocketBridge::TranslateKey(SDL_Keycode sdlkey)
+{
+  using namespace Rocket::Core::Input;
+
+
+  switch (sdlkey) {
+  case SDLK_UNKNOWN:
+    return KI_UNKNOWN;
+    break;
+  case SDLK_SPACE:
+    return KI_SPACE;
+    break;
+  case SDLK_0:
+    return KI_0;
+    break;
+  case SDLK_1:
+    return KI_1;
+    break;
+  case SDLK_2:
+    return KI_2;
+    break;
+  case SDLK_3:
+    return KI_3;
+    break;
+  case SDLK_4:
+    return KI_4;
+    break;
+  case SDLK_5:
+    return KI_5;
+    break;
+  case SDLK_6:
+    return KI_6;
+    break;
+  case SDLK_7:
+    return KI_7;
+    break;
+  case SDLK_8:
+    return KI_8;
+    break;
+  case SDLK_9:
+    return KI_9;
+    break;
+  case SDLK_a:
+    return KI_A;
+    break;
+  case SDLK_b:
+    return KI_B;
+    break;
+  case SDLK_c:
+    return KI_C;
+    break;
+  case SDLK_d:
+    return KI_D;
+    break;
+  case SDLK_e:
+    return KI_E;
+    break;
+  case SDLK_f:
+    return KI_F;
+    break;
+  case SDLK_g:
+    return KI_G;
+    break;
+  case SDLK_h:
+    return KI_H;
+    break;
+  case SDLK_i:
+    return KI_I;
+    break;
+  case SDLK_j:
+    return KI_J;
+    break;
+  case SDLK_k:
+    return KI_K;
+    break;
+  case SDLK_l:
+    return KI_L;
+    break;
+  case SDLK_m:
+    return KI_M;
+    break;
+  case SDLK_n:
+    return KI_N;
+    break;
+  case SDLK_o:
+    return KI_O;
+    break;
+  case SDLK_p:
+    return KI_P;
+    break;
+  case SDLK_q:
+    return KI_Q;
+    break;
+  case SDLK_r:
+    return KI_R;
+    break;
+  case SDLK_s:
+    return KI_S;
+    break;
+  case SDLK_t:
+    return KI_T;
+    break;
+  case SDLK_u:
+    return KI_U;
+    break;
+  case SDLK_v:
+    return KI_V;
+    break;
+  case SDLK_w:
+    return KI_W;
+    break;
+  case SDLK_x:
+    return KI_X;
+    break;
+  case SDLK_y:
+    return KI_Y;
+    break;
+  case SDLK_z:
+    return KI_Z;
+    break;
+  case SDLK_SEMICOLON:
+    return KI_OEM_1;
+    break;
+  case SDLK_PLUS:
+    return KI_OEM_PLUS;
+    break;
+  case SDLK_COMMA:
+    return KI_OEM_COMMA;
+    break;
+  case SDLK_MINUS:
+    return KI_OEM_MINUS;
+    break;
+  case SDLK_PERIOD:
+    return KI_OEM_PERIOD;
+    break;
+  case SDLK_SLASH:
+    return KI_OEM_2;
+    break;
+  case SDLK_BACKQUOTE:
+    return KI_OEM_3;
+    break;
+  case SDLK_LEFTBRACKET:
+    return KI_OEM_4;
+    break;
+  case SDLK_BACKSLASH:
+    return KI_OEM_5;
+    break;
+  case SDLK_RIGHTBRACKET:
+    return KI_OEM_6;
+    break;
+  case SDLK_QUOTEDBL:
+    return KI_OEM_7;
+    break;
+  case SDLK_KP_0:
+    return KI_NUMPAD0;
+    break;
+  case SDLK_KP_1:
+    return KI_NUMPAD1;
+    break;
+  case SDLK_KP_2:
+    return KI_NUMPAD2;
+    break;
+  case SDLK_KP_3:
+    return KI_NUMPAD3;
+    break;
+  case SDLK_KP_4:
+    return KI_NUMPAD4;
+    break;
+  case SDLK_KP_5:
+    return KI_NUMPAD5;
+    break;
+  case SDLK_KP_6:
+    return KI_NUMPAD6;
+    break;
+  case SDLK_KP_7:
+    return KI_NUMPAD7;
+    break;
+  case SDLK_KP_8:
+    return KI_NUMPAD8;
+    break;
+  case SDLK_KP_9:
+    return KI_NUMPAD9;
+    break;
+  case SDLK_KP_ENTER:
+    return KI_NUMPADENTER;
+    break;
+  case SDLK_KP_MULTIPLY:
+    return KI_MULTIPLY;
+    break;
+  case SDLK_KP_PLUS:
+    return KI_ADD;
+    break;
+  case SDLK_KP_MINUS:
+    return KI_SUBTRACT;
+    break;
+  case SDLK_KP_PERIOD:
+    return KI_DECIMAL;
+    break;
+  case SDLK_KP_DIVIDE:
+    return KI_DIVIDE;
+    break;
+  case SDLK_KP_EQUALS:
+    return KI_OEM_NEC_EQUAL;
+    break;
+  case SDLK_BACKSPACE:
+    return KI_BACK;
+    break;
+  case SDLK_TAB:
+    return KI_TAB;
+    break;
+  case SDLK_CLEAR:
+    return KI_CLEAR;
+    break;
+  case SDLK_RETURN:
+    return KI_RETURN;
+    break;
+  case SDLK_PAUSE:
+    return KI_PAUSE;
+    break;
+  case SDLK_CAPSLOCK:
+    return KI_CAPITAL;
+    break;
+  case SDLK_PAGEUP:
+    return KI_PRIOR;
+    break;
+  case SDLK_PAGEDOWN:
+    return KI_NEXT;
+    break;
+  case SDLK_END:
+    return KI_END;
+    break;
+  case SDLK_HOME:
+    return KI_HOME;
+    break;
+  case SDLK_LEFT:
+    return KI_LEFT;
+    break;
+  case SDLK_UP:
+    return KI_UP;
+    break;
+  case SDLK_RIGHT:
+    return KI_RIGHT;
+    break;
+  case SDLK_DOWN:
+    return KI_DOWN;
+    break;
+  case SDLK_INSERT:
+    return KI_INSERT;
+    break;
+  case SDLK_DELETE:
+    return KI_DELETE;
+    break;
+  case SDLK_HELP:
+    return KI_HELP;
+    break;
+  case SDLK_F1:
+    return KI_F1;
+    break;
+  case SDLK_F2:
+    return KI_F2;
+    break;
+  case SDLK_F3:
+    return KI_F3;
+    break;
+  case SDLK_F4:
+    return KI_F4;
+    break;
+  case SDLK_F5:
+    return KI_F5;
+    break;
+  case SDLK_F6:
+    return KI_F6;
+    break;
+  case SDLK_F7:
+    return KI_F7;
+    break;
+  case SDLK_F8:
+    return KI_F8;
+    break;
+  case SDLK_F9:
+    return KI_F9;
+    break;
+  case SDLK_F10:
+    return KI_F10;
+    break;
+  case SDLK_F11:
+    return KI_F11;
+    break;
+  case SDLK_F12:
+    return KI_F12;
+    break;
+  case SDLK_F13:
+    return KI_F13;
+    break;
+  case SDLK_F14:
+    return KI_F14;
+    break;
+  case SDLK_F15:
+    return KI_F15;
+    break;
+  case SDLK_NUMLOCKCLEAR:
+    return KI_NUMLOCK;
+    break;
+  case SDLK_SCROLLLOCK:
+    return KI_SCROLL;
+    break;
+  case SDLK_LSHIFT:
+    return KI_LSHIFT;
+    break;
+  case SDLK_RSHIFT:
+    return KI_RSHIFT;
+    break;
+  case SDLK_LCTRL:
+    return KI_LCONTROL;
+    break;
+  case SDLK_RCTRL:
+    return KI_RCONTROL;
+    break;
+  case SDLK_LALT:
+    return KI_LMENU;
+    break;
+  case SDLK_RALT:
+    return KI_RMENU;
+    break;
+  case SDLK_LGUI:
+    return KI_LMETA;
+    break;
+  case SDLK_RGUI:
+    return KI_RMETA;
+    break;
+    /*case SDLK_LSUPER:
+    return KI_LWIN;
+    break;
+    case SDLK_RSUPER:
+    return KI_RWIN;
+    break;*/
+  default:
+    return KI_UNKNOWN;
+    break;
+  }
+}
+
+int RocketBridge::TranslateMouseButton(Uint8 button)
+{
+  switch (button)
+  {
+  case SDL_BUTTON_LEFT:
+    return 0;
+  case SDL_BUTTON_RIGHT:
+    return 1;
+  case SDL_BUTTON_MIDDLE:
+    return 2;
+  default:
+    return 3;
+  }
+}
+
+int RocketBridge::GetKeyModifiers()
+{
+  SDL_Keymod sdlMods = SDL_GetModState();
+
+  int retval = 0;
+
+  if (sdlMods & KMOD_CTRL)
+    retval |= Rocket::Core::Input::KM_CTRL;
+
+  if (sdlMods & KMOD_SHIFT)
+    retval |= Rocket::Core::Input::KM_SHIFT;
+
+  if (sdlMods & KMOD_ALT)
+    retval |= Rocket::Core::Input::KM_ALT;
+
+  return retval;
+}
 

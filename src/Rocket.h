@@ -1,11 +1,24 @@
 #pragma once
 
 #include <Rocket/Core.h>
-#include <Rocket/Core/Types.h>
-#include <Rocket/Core/String.h>
-#include <Rocket/Core/SystemInterface.h>
-#include <Rocket/Core/FileInterface.h>
-#include <Rocket/Core/RenderInterface.h>
+#include <Rocket/Controls.h>
+#include <Rocket/Debugger.h>
+
+
+struct RocketSurface {
+  typedef std::shared_ptr<Rocket::Core::Context> RocketContextPtr;
+
+  RocketContextPtr ctx;
+  uvec2 size;
+  oglplus::Texture      tex;
+  oglplus::Framebuffer  fbo;
+private:
+  oglplus::Context gl;
+public:
+  RocketSurface(const uvec2 & size);
+  void render();
+};
+
 
 class RocketBridge :
     public Rocket::Core::SystemInterface,
@@ -60,5 +73,9 @@ public:
   virtual bool GenerateTexture(Rocket::Core::TextureHandle& texture_handle, const Rocket::Core::byte* source, const Rocket::Core::Vector2i& source_dimensions);
   /// Called by Rocket when a loaded texture is no longer required.
   virtual void ReleaseTexture(Rocket::Core::TextureHandle texture_handle);
+
+  static int TranslateMouseButton(Uint8 button);
+  static int GetKeyModifiers();
+  static Rocket::Core::Input::KeyIdentifier TranslateKey(SDL_Keycode sdlkey);
 };
 

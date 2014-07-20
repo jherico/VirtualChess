@@ -19,7 +19,8 @@
 
 #pragma once
 
-void myGlDebugCallback(GLenum source,
+
+void GLAPIENTRY myGlDebugCallback(GLenum source,
   GLenum type,
   GLuint id,
   GLenum severity,

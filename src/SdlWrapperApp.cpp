@@ -32,7 +32,7 @@ int getSdlDisplayAtPosition(const ivec2 & pos, uvec2 & displaySize) {
   return -1;
 }
 
-void  myGlDebugCallback(
+void GLAPIENTRY myGlDebugCallback(
     GLenum source,
     GLenum type,
     GLuint id,

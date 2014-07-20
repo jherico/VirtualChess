@@ -10,7 +10,9 @@ private:
     max_read_length = 512
   };
 
-  boost::asio::io_service &     io_service;
+  boost::asio::io_service io_service;
+  boost::asio::io_service::work work;
+  boost::thread serviceThread;
   tcp::socket  socket;
 
   char socketReadBuffer[max_read_length];
@@ -21,8 +23,8 @@ private:
 
 public:
 
-  SocketClient(boost::asio::io_service& io_service) :
-      io_service(io_service), socket(io_service) {
+  SocketClient() :
+    work(io_service), serviceThread(boost::bind(&boost::asio::io_service::run, &io_service)), socket(io_service) {
   }
 
   void write(const char msg) {
