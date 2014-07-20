@@ -3,7 +3,7 @@ include (GenerateExportHeader)
 
 set(RESOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
-file(GLOB FONTS fonts/*.sdff fonts/*.otf)
+file(GLOB FONTS fonts/*.sdff fonts/*.otf fonts/*.ttf)
 file(GLOB_RECURSE IMAGES images/*.png)
 file(GLOB_RECURSE MESHES meshes/*.ctm)
 file(GLOB_RECURSE MISC misc/*)

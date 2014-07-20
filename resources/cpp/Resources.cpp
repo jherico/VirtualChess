@@ -102,7 +102,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 }
 
 size_t Resources::getResourceSize(Resource resource) {
-  const std::string & path = getResourcePath(resource);
+  const std::string & path = ::getResourcePath(resource);
   HRSRC res = FindResourceA(module, path.c_str(), "TEXTFILE");
   assert(res);
   DWORD size = SizeofResource(module, res);
@@ -110,7 +110,7 @@ size_t Resources::getResourceSize(Resource resource) {
 }
 
 void Resources::getResourceData(Resource resource, void * out) {
-  const std::string & path = getResourcePath(resource);
+  const std::string & path = ::getResourcePath(resource);
   HRSRC res = FindResourceA(module, path.c_str(), "TEXTFILE");
   assert(res);
   HGLOBAL mem = LoadResource(module, res);

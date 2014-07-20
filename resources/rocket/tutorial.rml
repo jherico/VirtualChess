@@ -1,0 +1,73 @@
+<rml>
+<head>
+  <link type="text/css" href="tutorial.rcss"/>
+  <title>Window</title>
+  <style>
+    body
+    {
+      width: 100%;
+      height: 100%;
+      margin: 30px;
+    }
+
+    datagridcell
+    {
+        text-align: left;
+    }
+
+    datagridexpand
+    {
+        display: inline-block;
+        vertical-align: -3px;
+        margin-right: 2px;
+    }
+    
+    spacer
+    {
+        display: inline-block;
+        width: 25px;
+    }
+  </style>
+</head>
+
+<body class="window">
+        <div id="login">
+          <form>
+              <hr/>
+              Username: <br/>
+              <input id="username" type="text" value="Hello"/><br/>
+              Password: <br/>
+              <input id="password" type="password" value="Goodbye"/>
+              <hr/>
+              <input id="connect" type="submit" >Connect</input>
+          </form>
+        </div>
+<!-- 
+<tabset id="tabset">
+    <tab id="tab_connect">Connect</tab>
+    <panel>
+    </panel>
+
+    <tab id="tab_char">Chat</tab>
+    <panel>
+        Welcome to the second tab!
+    </panel>
+
+    <tab id="tab_players">Players</tab>
+    <panel>
+        Player 1<br/>
+        Player 2<br/>
+        Player 3<br/>
+    </panel>
+    <tab id="tab_games">Games</tab>
+    <panel>
+    </panel>
+</tabset>
+ -->
+      <datagrid source="gameList.root" style="height: 100%;">
+          <col fields="Player1" width="50%"/>
+          <col fields="Player2" width="50%"/>
+      </datagrid>
+
+</body>
+</rml>
