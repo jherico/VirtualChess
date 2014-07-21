@@ -1,0 +1,27 @@
+<rml>
+<head>
+<link type="text/css" href="rkt.rcss" />
+<link type="text/css" href="invader.rcss" />
+<title>Window</title>
+<style>
+
+div#window {
+    height: 94%;
+    margin: 1%;
+}
+
+</style>
+</head>
+<body>
+  <div id="window"> 
+    <div id="content">
+      <datagrid source="gameList.root">
+          <col fields="GameId" width="5%">Id</col>
+          <col fields="Player1" width="30%">Player (White)</col>
+          <col fields="Player2" width="30%">Player (Black)</col>
+          <col fields="Type" width="35%">Type</col>
+      </datagrid>
+    </div>
+  </div>
+</body>
+</rml>

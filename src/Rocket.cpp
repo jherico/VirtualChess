@@ -103,9 +103,14 @@ Rocket::Core::FileHandle RocketBridge::Open(const Rocket::Core::String& path)
 {
   if (!path.Empty() && '+' == path[0]) {
     Resource res = static_cast<Resource>(atoi(path.Substring(0).CString()));
-    return (Rocket::Core::FileHandle)new std::istringstream(Platform::getResourceString(res));
+    return (Rocket::Core::FileHandle)new std::istringstream(Platform::getResourceString(res), std::ios::binary);
   } else {
-    return (Rocket::Core::FileHandle)new std::ifstream(path.CString());
+    std::ifstream * result = new std::ifstream(path.CString(), std::ios::binary);
+    if (!(*result)) {
+      delete result;
+      return -1;
+    }
+    return (Rocket::Core::FileHandle)result;
   }
   return -1;
 }
@@ -123,7 +128,7 @@ size_t RocketBridge::Read(void* buffer, size_t size, Rocket::Core::FileHandle fi
   std::istream & stream = *(std::istream*)file;
   size_t result = 0;
   char * charBuffer = (char*)buffer;
-  while (stream && !stream.eof()) {
+  while (stream && result < size && !stream.eof()) {
     stream.read(charBuffer++, 1);
     result++;
   }
@@ -306,25 +311,16 @@ struct TGAHeader
 
 // Called by Rocket when a texture is required by the library.
 bool RocketBridge::LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rocket::Core::Vector2i& texture_dimensions, const Rocket::Core::String& source)
-{
-    Rocket::Core::FileInterface* file_interface = Rocket::Core::GetFileInterface();
-    Rocket::Core::FileHandle file_handle = file_interface->Open(source);
-    if (!file_handle)
-    {
-        return false;
+{ 
+    std::string tgaData; {
+      std::stringstream sstr;
+      sstr << std::ifstream(source.CString(), std::ios::binary).rdbuf();
+      tgaData = sstr.str();
     }
-
-    file_interface->Seek(file_handle, 0, SEEK_END);
-    size_t buffer_size = file_interface->Tell(file_handle);
-    file_interface->Seek(file_handle, 0, SEEK_SET);
-
-    char* buffer = new char[buffer_size];
-    file_interface->Read(buffer, buffer_size, file_handle);
-    file_interface->Close(file_handle);
-
+    const char * data = tgaData.data();
+    size_t buffer_size = tgaData.size();
     TGAHeader header;
-    memcpy(&header, buffer, sizeof(TGAHeader));
-
+    memcpy(&header, data, sizeof(TGAHeader));
     int color_mode = header.bitsPerPixel / 8;
     int image_size = header.width * header.height * 4; // We always make 32bit textures
 
@@ -341,7 +337,7 @@ bool RocketBridge::LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rock
         return false;
     }
 
-    const char* image_src = buffer + sizeof(TGAHeader);
+    const char* image_src = data + sizeof(TGAHeader);
     unsigned char* image_dest = new unsigned char[image_size];
 
     // Targa is BGR, swap to RGB and flip Y axis
@@ -373,7 +369,6 @@ bool RocketBridge::LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rock
     bool success = GenerateTexture(texture_handle, image_dest, texture_dimensions);
 
     delete [] image_dest;
-    delete [] buffer;
 
     return success;
 }

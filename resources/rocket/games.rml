@@ -1,0 +1,52 @@
+<rml>
+<head>
+<link type="text/css" href="rkt.rcss" />
+<link type="text/css" href="invader.rcss" />
+<title>Window</title>
+<style>
+
+div#window {
+    height: 94%;
+}
+
+input.text
+{
+  margin: 5px;
+  font-family: Delicious;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 16;
+  color: white;
+  height: 60px;
+  width: 200px;
+  border-width: 1px;
+  border-color: rgb(200,200,200);
+  background-color: rgb(20,20,20);
+}
+
+</style>
+</head>
+<body>
+  <div id="window">
+    <div id="content">
+        <div id="div_chat" style="visibility: hidden;">
+        </div>
+        <div id="div_players" style="visibility: hidden;">
+            Player 1<br/>
+            Player 2<br/>
+            Player 3<br/>
+            Player 4<br/>
+            Player 5<br/>
+        </div>
+        <div id="div_games">
+            <datagrid source="gameList.root">
+                <col fields="GameId" width="5%">Id:</col>
+                <col fields="Player1" width="20%">Player (White):</col>
+                <col fields="Player2" width="20%">Player (Black):</col>
+                <col fields="score" width="55%">Score:</col>
+            </datagrid>
+        </div>
+    </div>
+  </div>
+</body>
+</rml>

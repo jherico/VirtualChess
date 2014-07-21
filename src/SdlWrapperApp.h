@@ -66,6 +66,7 @@ public:
     T wrapped(getArgs());
     while (!wrapped.isDone()) {
       wrapped.onTick();
+//      SDL_GL_SwapWindow(window);
     }
     return 0;
   }

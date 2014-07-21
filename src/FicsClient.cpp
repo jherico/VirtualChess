@@ -465,15 +465,6 @@ namespace Fics {
         break;
 
       case INTERFACE_SETUP:
-        state = IDLE;
-        if (callback) {
-          Event ev;
-          ev.type = EventType::NETWORK;
-          ev.network.connected = true;
-          callback(ev);
-        }
-        break;
-
       case IDLE:
         processReadBuffer();
         break;
@@ -515,6 +506,8 @@ namespace Fics {
     }
 
     void parseCommand(const string & command) {
+
+
       int idSep = command.find(BlockDelimiter::BLOCK_SEPARATOR);
       int commandId = atoi(command.substr(0, idSep++).c_str());
       int codeSep = command.find(BlockDelimiter::BLOCK_SEPARATOR, idSep);
@@ -522,6 +515,15 @@ namespace Fics {
       string commandResult = command.substr(codeSep);
       switch (commandCode) {
       case BlockCode::BLK_ISET:
+        if (INTERFACE_SETUP == state) {
+          state = IDLE;
+          if (callback) {
+            Event ev;
+            ev.type = EventType::NETWORK;
+            ev.network.connected = true;
+            callback(ev);
+          }
+        }
         return;
 
       case BlockCode::BLK_GAMES: 
@@ -534,7 +536,22 @@ namespace Fics {
           callback(ev);
         } return;
         
-
+      case BlockCode::BLK_OBSERVE:
+        if (callback) {
+          vector<string> lines = parseFicsLines(commandResult);
+          for (int i = 0; i < lines.size(); ++i) {
+            const string & str = lines[i];
+            if (0 == str.find("<12>")) {
+              GameStatePtr ptr(new GameState(str));
+              Event ev;
+              ev.gameState.type = EventType::GAME_STATE;
+              ev.gameState.state = ptr.get();
+              callback(ev);
+            }
+          }
+        } return;
+      default:
+        SAY(commandResult.c_str());
       }
       // TODO send a notification
     }
@@ -576,6 +593,10 @@ namespace Fics {
 
     virtual void observeGame(int id) {
       command(Platform::format("observe %d", id));
+    }
+
+    virtual void unobserveGame(int id) {
+      command(Platform::format("unobserve %d", id));
     }
   };
 

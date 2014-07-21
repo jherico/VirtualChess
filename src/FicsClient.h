@@ -121,6 +121,7 @@ namespace Fics {
     virtual void connect(const std::string & username, const std::string & passwword) = 0;
     virtual void listGames() = 0;
     virtual void observeGame(int id) = 0;
+    virtual void unobserveGame(int id) = 0;
     virtual void setEventHandler(boost::function<void(const Event&)> callback) {
       this->callback = callback;
     }

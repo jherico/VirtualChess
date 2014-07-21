@@ -36,7 +36,7 @@ Resource PIECE_RESOURCES[] = {
 static uvec2 UI_SIZE(800, 600);
 
 
-class GameListSource : public Rocket::Controls::DataSource
+static class GameListSource : public Rocket::Controls::DataSource
 {
   Fics::GameList & list;
 public:
@@ -53,7 +53,11 @@ public:
   virtual void GetRow(Rocket::Core::StringList& row, const Rocket::Core::String& table, int row_index, const Rocket::Core::StringList& columns) {
     const Fics::GameSummary & game = list.at(row_index);
     for (int i = 0; i < columns.size(); ++i) {
-      if (columns[i] == "Player1") {
+      if (columns[i] == "GameId") {
+        Rocket::Core::String str;
+        str.FormatString(16, "%d", game.id);
+        row.push_back(str);
+      } else if (columns[i] == "Player1") {
         row.push_back(game.players[0].c_str());
       } else if (columns[i] == "Player2") {
         row.push_back(game.players[1].c_str());
@@ -66,7 +70,7 @@ public:
 
   virtual int GetNumRows(const Rocket::Core::String& table) {
     //return list.size();
-    return std::min((int)list.size(), 10);
+    return std::min((int)list.size(), 12);
   }
 
   void Update() {
@@ -74,45 +78,39 @@ public:
   }
 };
 
-class GameListFormatter : public Rocket::Controls::DataFormatter
-{
-public:
-  GameListFormatter() : Rocket::Controls::DataFormatter("game") {
 
-  }
-
-  virtual ~GameListFormatter() {
-
-  }
-
-  void FormatData(Rocket::Core::String& formatted_data, const Rocket::Core::StringList& raw_data) {
-    formatted_data = "Test";
-  }
-};
-
-
+static Geometry & getPieceGeometry(Chess::Piece piece) {
+  int pieceShape = (piece - 1) & 0x0F;
+  Resource res = PIECE_RESOURCES[pieceShape];
+  return GlUtils::getGeometry(res);
+}
 
 class VirtualChess : public RiftApp, public Rocket::Core::EventListener {
   bool quit{ false };
-  mat4 player;
-  Fics::ClientPtr ficsClient;
+  // Task queue
+  boost::mutex taskQueueMutex;
+  std::queue<boost::function<void()> > taskQueue;
+
+  // GL rendering
+  mat4 player{ glm::inverse(glm::lookAt(vec3(0, 0.25, 0.35), vec3(0, 0.25, 0), vec3(0, 1, 0))) };
   Lights lights;
+
+  // FICS state and interaction
+  Fics::ClientPtr ficsClient;
   Fics::GameList games;
-  GameListSource listSource;
-  GameListFormatter listFormatter;
   Chess::Board board;
-  RocketSurface uiSurface; 
+  int activeGame{ -1 };
+  bool loggedIn{ false };
+
+  // UI rendering
+  GameListSource listSource;
+  RocketSurface uiSurface;
   Geometry uiGeometry;
-  Rocket::Core::ElementDocument* document;
-  boost::mutex documentMutex;
-  Rocket::Controls::ElementTabSet* tabset;
-
-
-  static Geometry & getPieceGeometry(Chess::Piece piece) {
-    int pieceShape = (piece - 1) & 0x0F;
-    Resource res = PIECE_RESOURCES[pieceShape];
-    return GlUtils::getGeometry(res);
-  }
+  Rocket::Core::ElementDocument* document{ nullptr };
+  enum Pane {
+    CHAT, PLAYERS, GAMES
+  };
+  Pane pane{ CHAT };
 
 public:
 
@@ -127,9 +125,9 @@ public:
     // We want text input
     SDL_StartTextInput();
 
-    // Starting position of the player
-    player = glm::inverse(glm::lookAt(vec3(0, 0.25, 0.35), vec3(0, 0.25, 0), vec3(0, 1, 0)));
-    reloadDocument();
+    // Set the callback for FICS events   
+    ficsClient->setEventHandler(boost::bind(&VirtualChess::onFicsEvent, this, _1));
+
     // Load the rocket UI
     uiSurface.ctx->LoadMouseCursor("/users/bdavis/git/VirtualChess/resources/rocket/cursor.rml");
     string username, password; {
@@ -139,19 +137,23 @@ public:
       prefs >> password;
     }
 
-    ficsClient->setEventHandler(boost::bind(&VirtualChess::onFicsEvent, this, _1));
-//    ficsClient->connect(username, password);
-//    Fics::GameList games = ficsClient->games();
-//    ficsClient->observeGame(8);
     {
       Mesh uiMesh;
       uiMesh.addTexturedQuad(0.8f, 0.6f);
       uiGeometry.loadMesh(uiMesh);
     }
+    reloadDocument();
+  }
+
+  template <typename Function> 
+  void addTask(Function f) {
+    withScopedLock(taskQueueMutex, [&](const boost::mutex::scoped_lock &){
+      taskQueue.push(f);
+    });
   }
 
 
-  void readLogin(std::string & username, std::string & password) {
+  static void readLogin(std::string & username, std::string & password) {
     string homeDir = getenv("HOME");
     istringstream prefs(Files::read(homeDir + "/.ficsLogin"));
     prefs >> username;
@@ -166,55 +168,103 @@ public:
   }
 
   virtual void reloadDocument() {
-    withScopedLock(documentMutex, [&](const boost::mutex::scoped_lock &){
+    addTask([&]{
       if (nullptr != document) {
+        document->RemoveEventListener("click", this);
         uiSurface.ctx->UnloadAllDocuments();
         document = nullptr;
       }
 
+      if (loggedIn) {
+        document = uiSurface.ctx->LoadDocument("/users/bdavis/git/VirtualChess/resources/rocket/main.rml");
+      } else {
+        document = uiSurface.ctx->LoadDocument("/users/bdavis/git/VirtualChess/resources/rocket/login.rml");
+      }
 
-      document = uiSurface.ctx->LoadDocument("/users/bdavis/git/VirtualChess/resources/rocket/tutorial.rml");
-      if (nullptr != document)
-      {
+      if (nullptr != document) {
         document->Show(Rocket::Core::ElementDocument::MODAL);
-        tabset = (Rocket::Controls::ElementTabSet*)document->GetElementById("tabset");
-        string username, password; readLogin(username, password);
-        Rocket::Controls::ElementFormControlInput * uel = (Rocket::Controls::ElementFormControlInput *)document->GetElementById("username");
-        uel->SetValue(username.c_str());
-        Rocket::Controls::ElementFormControlInput * pel = (Rocket::Controls::ElementFormControlInput *)document->GetElementById("password");
-        pel->SetValue(password.c_str());
-        Rocket::Controls::ElementFormControlInput * cel = (Rocket::Controls::ElementFormControlInput *)document->GetElementById("connect");
+        if (!loggedIn) {
+          string username, password; readLogin(username, password);
+          Rocket::Controls::ElementFormControlInput * uel = (Rocket::Controls::ElementFormControlInput *)document->GetElementById("username");
+          uel->SetValue(username.c_str());
+          Rocket::Controls::ElementFormControlInput * pel = (Rocket::Controls::ElementFormControlInput *)document->GetElementById("password");
+          pel->SetValue(password.c_str());
+          Rocket::Controls::ElementFormControlInput * cel = (Rocket::Controls::ElementFormControlInput *)document->GetElementById("connect");
+        }
         document->AddEventListener("click", this);
         document->RemoveReference();
       }
     });
   }
 
-  /// Process the incoming Rocket 
+  // Process the incoming Rocket event
   virtual void ProcessEvent(Rocket::Core::Event& event) {
-    if (Rocket::Core::String("connect") == event.GetTargetElement()->GetId()) {
+    Rocket::Core::Element * el = event.GetTargetElement();
+    string elId = el->GetId().CString();
+    string elTag = el->GetTagName().CString();
+    if (string("connect") == elId) {
       string username, password;
       readLoginControls(username, password);
       ficsClient->connect(username, password);
       return;
+    } 
+    
+    if (string("datagridcell") == elTag) {
+      Rocket::Controls::ElementDataGridRow * row = (Rocket::Controls::ElementDataGridRow *)el->GetParentNode();
+      SAY("Row %d", row->GetTableRelativeIndex());
+      const Fics::GameSummary & summary = games.at(row->GetTableRelativeIndex());
+      if (-1 != activeGame) {
+        ficsClient->unobserveGame(activeGame);
+      }
+      activeGame = summary.id;
+      ficsClient->observeGame(activeGame);
+      ficsClient->listGames();
+      return;
     }
-    //EventListener::ProcessEvent(event);
-    SAY("Event");
+
+    if (string("select_players") == elId) {
+      document->GetElementById("div_players")->SetProperty("visibility", "visible");
+      document->GetElementById("div_games")->SetProperty("visibility", "hidden");
+      document->GetElementById("div_chat")->SetProperty("visibility", "hidden");
+      return;
+    } 
+    if (string("select_games") == elId) {
+      document->GetElementById("div_players")->SetProperty("visibility", "hidden");
+      document->GetElementById("div_games")->SetProperty("visibility", "visible");
+      document->GetElementById("div_chat")->SetProperty("visibility", "hidden");
+      return;
+    }
+    if (string("select_chat") == elId) {
+      document->GetElementById("div_players")->SetProperty("visibility", "hidden");
+      document->GetElementById("div_games")->SetProperty("visibility", "hidden");
+      document->GetElementById("div_chat")->SetProperty("visibility", "visible");
+      return;
+    }
+    SAY("Id: %s Tag: %s", elId.c_str(), elTag.c_str());
   }
 
   virtual void onFicsEvent(const Fics::Event & event) {
-    SAY("FICS event");
     switch (event.type) {
+
       case Fics::EventType::NETWORK: {
+        loggedIn = true;
         ficsClient->listGames();
-      }return;
+        reloadDocument();
+      } return;
+
       case Fics::EventType::GAME_LIST: {
         games = *event.gameList.list;
         reloadDocument();
-        listSource.Update();
-        SAY("Game List");
-      }return;
+      } return;
+
+      case Fics::EventType::GAME_STATE: {
+        auto gameState = *event.gameState.state;
+        if (gameState.id == activeGame) {
+          board = gameState.board;
+        }
+      } return;
     }
+    SAY("Unhandled FICS event");
   }
 
   virtual bool isDone() {
@@ -222,9 +272,16 @@ public:
   }
 
   void updateState() {
-    withScopedLock(documentMutex, [&](const boost::mutex::scoped_lock &){
-      uiSurface.render();
+    // Process any background tasks queued up
+    withScopedLock(taskQueueMutex, [&](const boost::mutex::scoped_lock &){
+      while (!taskQueue.empty()) {
+        boost::function<void()> f = taskQueue.front();
+        taskQueue.pop();
+        f();
+      }
     });
+
+    uiSurface.render();
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -238,8 +295,10 @@ public:
         } return;
 
       case SDL_MOUSEMOTION: {
-          uvec2 mpos(event.motion.x, event.motion.y);
-          mpos = glm::min(mpos, UI_SIZE);
+          vec2 mpos(event.motion.x, event.motion.y);
+          mpos.x /= windowSize.x;
+          mpos.y /= windowSize.y;
+          mpos *= UI_SIZE;
           uiSurface.ctx->ProcessMouseMove(mpos.x, mpos.y, RocketBridge::GetKeyModifiers());
         } return;
 

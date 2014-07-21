@@ -1,0 +1,49 @@
+<rml>
+<head>
+<link type="text/css" href="rkt.rcss" />
+<link type="text/css" href="invader.rcss" />
+<title>Window</title>
+<style>
+div#window {
+    height: 93%;
+    margin: 2%;
+}
+
+div#content {
+   position:absolute;
+    top:10%;
+    right:0;
+    left:0;
+}
+
+input.text,
+input.password
+{
+  margin: 5px;
+  font-family: Delicious;
+  font-weight: normal;
+  font-style: normal;
+  padding: 30px 30px 0px;
+  font-size: 40;
+  color: white;
+  height: 90px;
+  width: 300px;
+  border-width: 1px;
+  border-color: rgb(200,200,200);
+  background-color: rgb(20,20,20);
+}
+
+</style>
+</head>
+<body>
+  <div id="window">
+    <div id="content" align="left" style="vertical-align: bottom;">
+      <form>
+          <span style="font-size: 60;">Username</span><br/><input id="username" type="text" value=""/><br/>
+          <span style="font-size: 60;">Password</span><br/><input id="password" type="password" value=""/><br/>
+          <input id="connect" type="submit" >Connect</input>
+      </form>
+    </div>
+  </div>
+</body>
+</rml>
