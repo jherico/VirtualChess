@@ -11,4 +11,26 @@ namespace Chess {
     BP, BP, BP, BP, BP, BP, BP, BP,
     BR, BN, BB, BQ, BK, BB, BN, BR,
   };
+
+  static std::string TYPE_NAMES[] = {
+      "Unknown",
+      "Standard",
+      "Nonstandard",
+      "Untimed",
+      "Examined",
+      "Lightning",
+      "Blitz",
+      "Suicide",
+      "Wild",
+      "Crazyhouse",
+      "Bughouse",
+      "Losers",
+      "Atomic",
+  };
+
+  const std::string & getTypeName(int gameType) {
+    return TYPE_NAMES[gameType + 1];
+  }
+
+
 }

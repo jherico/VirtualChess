@@ -329,7 +329,7 @@ public:
 
         //frameBuffers[eye].activate();
         eyeArgs.fbo.Bind(oglplus::Framebuffer::Target::Draw);
-        gl.Viewport(eyeArgs.ovrTexture.Texture.Header.TextureSize.w,
+        gl.Viewport(0, 0, eyeArgs.ovrTexture.Texture.Header.TextureSize.w,
           eyeArgs.ovrTexture.Texture.Header.TextureSize.h);
         // Render the scene to an offscreen buffer
         drawScene();

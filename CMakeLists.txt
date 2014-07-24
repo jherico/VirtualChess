@@ -70,6 +70,16 @@ include_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/include)
 link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86/)
 list(APPEND PROJECT_LIBS SDL2)
 
+if (WIN32)
+    set(Boost_USE_STATIC_LIBS    ON)
+endif()
+set(Boost_USE_MULTITHREADED  ON)
+set(Boost_USE_STATIC_RUNTIME ON)
+find_package(Boost COMPONENTS filesystem system thread)
+include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_LIBRARY_DIR})
+list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
+
 ###############################################################################
 #
 # Oculus VR SDK dependency 
@@ -94,37 +104,16 @@ set_target_properties(OpenCTM PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/OpenCTM)
 list(APPEND PROJECT_LIBS OpenCTM)
 
-# Freetype
-add_subdirectory(libraries/freetype)
-include_directories(libraries/freetype/include)
-list(APPEND PROJECT_LIBS freetype)
-set_target_properties(freetype PROPERTIES FOLDER "3rdparty")
-
-set(FREETYPE_LIBRARY freetype)
-set(FREETYPE_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/libraries/freetype/include)
-
-add_subdirectory(libraries/rocket)
-set_target_properties(Rocket PROPERTIES FOLDER "3rdparty")
-include_directories(libraries/rocket/Include)
-list(APPEND PROJECT_LIBS Rocket)
-#list(APPEND PROJECT_LIBS RocketControls)
-#list(APPEND PROJECT_LIBS RocketDebugger)
-
-#add_subdirectory(libraries/sdl2)
-#include_directories(libraries/sdl2/include)
-#list(APPEND PROJECT_LIBS SDL2)
-#list(APPEND PROJECT_LIBS ${SDL2-LIB_DEPENDS})
-
-
-if (WIN32)
-    set(Boost_USE_STATIC_LIBS    ON)
-endif()
-set(Boost_USE_MULTITHREADED  ON)
-set(Boost_USE_STATIC_RUNTIME ON)
-find_package(Boost COMPONENTS filesystem system thread)
-include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_LIBRARY_DIR})
-list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
+set(CEGUI_DIR /dev/cegui-0.8.4)
+list(APPEND CEGUI_LIBS CEGUIBase-0_d)
+list(APPEND CEGUI_LIBS CEGUISILLYImageCodec_d)
+list(APPEND CEGUI_LIBS CEGUIExpatParser_d) 
+list(APPEND CEGUI_LIBS CEGUICoreWindowRendererSet_d)
+list(APPEND CEGUI_LIBS CEGUIOpenGLRenderer-0_d)
+list(APPEND CEGUI_LIBS CEGUICommonDialogs-0_d)
+include_directories(${CEGUI_DIR}/cegui/include)
+link_directories(${CEGUI_DIR}/lib)
+list(APPEND PROJECT_LIBS ${CEGUI_LIBS})
 
 if((WIN32 OR APPLE))
     # zlib
@@ -166,13 +155,13 @@ list(APPEND PROJECT_LIBS ${CMAKE_THREAD_LIBS_INIT} )
 
 ###############################################################################
 #
-# GLM - Vector / matrix header only math library based on the syntax of GLSL
+# GLM - header only vector / matrix math library based on the syntax of GLSL
 #
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glm)
 
 ###############################################################################
 #
-# OpenGL object wrappers  
+# oglplus - header only OpenGL wrapper 
 #
 include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/include)
 include_directories(${CMAKE_SOURCE_DIR}/libraries/oglplus/implement)

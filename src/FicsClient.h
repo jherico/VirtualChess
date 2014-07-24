@@ -84,7 +84,7 @@ namespace Fics {
 
   struct EventChat {
     uint32_t        type;
-    std::string     message;
+    const char *    message;
   };
 
   struct EventPlayerList {
@@ -107,6 +107,7 @@ namespace Fics {
     EventGameState  gameState;
     EventPlayerList playerList;
     EventGameList   gameList;
+    EventChat       chat;
     EventNetwork    network;
   } Event;
 

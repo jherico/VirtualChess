@@ -70,4 +70,6 @@ namespace Chess {
     f(Chess::Side::WHITE);
     f(Chess::Side::BLACK);
   }
+
+  const std::string & getTypeName(int gameType);
 }

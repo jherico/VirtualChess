@@ -506,8 +506,6 @@ namespace Fics {
     }
 
     void parseCommand(const string & command) {
-
-
       int idSep = command.find(BlockDelimiter::BLOCK_SEPARATOR);
       int commandId = atoi(command.substr(0, idSep++).c_str());
       int codeSep = command.find(BlockDelimiter::BLOCK_SEPARATOR, idSep);
@@ -575,7 +573,9 @@ namespace Fics {
           callback(ev);
         }
         else {
-          SAY(line.c_str());
+          ev.chat.type = EventType::CHAT;
+          ev.chat.message = line.c_str();
+          callback(ev);
         }
       }
     }

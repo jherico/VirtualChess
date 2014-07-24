@@ -66,12 +66,14 @@ public:
     T wrapped(getArgs());
     while (!wrapped.isDone()) {
       wrapped.onTick();
-//      SDL_GL_SwapWindow(window);
+      //SDL_GL_SwapWindow(window);
     }
     return 0;
   }
 
   virtual void onCreate() {
+    SDL_StartTextInput();
+    SDL_ShowCursor(0);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     GLuint unusedIds = 0;
     if (glDebugMessageCallback) {

@@ -98,6 +98,8 @@ using glm::quat;
 
 #include <SDL.h>
 
+#include <CEGUI/CEGUI.h>
+
 #include <Resources.h>
 
 typedef std::shared_ptr<void*> VoidPtr;
@@ -185,5 +187,7 @@ inline float aspect(T const & size) {
 #include "GlUtils.h"
 #include "RenderUtils.h"
 #include "SdlWrapperApp.h"
+#include "Gui.h"
+
 #include "Rift.h"
 
