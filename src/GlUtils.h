@@ -78,6 +78,7 @@ namespace Layout {
       Projection = 0,
       ModelView = 1,
       NormalMatrix = 2,
+      Time = 3,
       Color = 4,
       LightAmbient = 8,
       LightCount = 9,

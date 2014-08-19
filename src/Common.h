@@ -113,6 +113,7 @@ public:
     static void say(std::ostream & out, const char * message, ...);
     static std::string format(const char * formatString, ...);
     static std::string getResourcePath(Resource resource);
+    static time_t getResourceModified(Resource resource);
     static std::string getResourceString(Resource resource);
     static std::vector<uint8_t> getResourceVector(Resource resource);
 };

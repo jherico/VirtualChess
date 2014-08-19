@@ -319,7 +319,6 @@ public:
 
       case Fics::EventType::CHAT: {
         string message(event.chat.message);
-        //rootWindow->getChild("Tabs/")
         Listbox * mle = static_cast<Listbox*>(rootWindow->getChild("Tabs/Chat/Lines"));
         mle->addItem(new ListboxTextItem(message));
       } return;
@@ -333,13 +332,67 @@ public:
 
 #define MAX_MILLIS 1
 
+  bool handleSdlEvent(const SDL_Event & event) {
+    switch (event.type) {
+      case SDL_KEYDOWN: {
+        switch (event.key.keysym.sym) {
+          case SDLK_F6: {
+            ovrHmd_RecenterPose(hmd);
+          } return true;
+    
+          case SDLK_F5: {
+            static bool lowPersistence = false;
+            if (lowPersistence) {
+              ovrHmd_SetEnabledCaps(hmd, ovrHmd_GetEnabledCaps(hmd) & ~ovrHmdCap_LowPersistence);
+              lowPersistence = false;
+            }
+            else {
+              ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence);
+              lowPersistence = true;
+            }
+          } return true;
+
+          case SDLK_F4: {
+            static bool dynamic = false;
+            if (dynamic) {
+              ovrHmd_SetEnabledCaps(hmd, ovrHmd_GetEnabledCaps(hmd) & ~ovrHmdCap_DynamicPrediction);
+              dynamic = false;
+            }
+            else {
+              ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_DynamicPrediction);
+              dynamic = true;
+            }
+          } return true;
+
+          case SDLK_q: {
+            if (event.key.keysym.mod & KMOD_CTRL) {
+              quit = true;
+              return true;
+            }
+          }
+          default:
+            break;
+        } // switch (event.key.keysym.sym)
+      } // case SDL_KEYDOWN
+    } // switch (event.type) 
+    return false;
+  }
+
   void updateState() {
+    ovrHSWDisplayState hsw;
+    ovrHmd_GetHSWDisplayState(hmd, &hsw);
+    if (hsw.Displayed) {
+      ovrHmd_DismissHSWDisplay(hmd);
+    }
     // Process any background tasks queued up
     taskQueue.drain(MAX_MILLIS);
 
     static const vec2 windowScaleFactor = vec2(UI_SIZE) / vec2(windowSize);
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+      if (handleSdlEvent(event)) {
+        continue;
+      }
       if (Gui::handleSdlEvent(event, windowScaleFactor)) {
         continue;
       }
@@ -408,7 +461,9 @@ public:
     gl.Clear().ColorBuffer().DepthBuffer();
     int viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
-    Render::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    Render::renderProceduralSkybox(Resource::SHADERS_MOVINGTHROUGHSPEHERESPACE_FS);
+//    Render::renderSkybox(Resource::IMAGES_SKY_CITY_XNEG_PNG);
+    return;
     MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
       mv.translate(vec3(0, 0.35, -0.35f));

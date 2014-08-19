@@ -112,20 +112,18 @@ void for_each_eye(Function function) {
 class RiftManagerApp {
 protected:
   ovrHmd hmd;
-  ovrHmdDesc hmdDesc;
 
   uvec2 hmdNativeResolution;
   ivec2 hmdDesktopPosition;
 
 public:
-  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK1) {
+  RiftManagerApp(ovrHmdType defaultHmdType = ovrHmd_DK2) {
     hmd = ovrHmd_Create(0);
     if (NULL == hmd) {
       hmd = ovrHmd_CreateDebug(defaultHmdType);
     }
-    ovrHmd_GetDesc(hmd, &hmdDesc);
-    hmdNativeResolution = ivec2(hmdDesc.Resolution.w, hmdDesc.Resolution.h);
-    hmdDesktopPosition = ivec2(hmdDesc.WindowsPos.x, hmdDesc.WindowsPos.y);
+    hmdNativeResolution = ivec2(hmd->Resolution.w, hmd->Resolution.h);
+    hmdDesktopPosition = ivec2(hmd->WindowsPos.x, hmd->WindowsPos.y);
   }
 
   virtual ~RiftManagerApp() {
@@ -138,7 +136,6 @@ public:
 struct RiftWrapperArgs {
   uvec2       windowSize;
   ovrHmd      hmd;
-  ovrHmdDesc  hmdDesc;
 };
 /**
 A class that takes care of the basic duties of putting an OpenGL
@@ -164,19 +161,20 @@ public:
     }
 
     Platform::sleepMillis(200);
-    if (!ovrHmd_StartSensor(hmd, 0, 0)) {
+    if (!ovrHmd_ConfigureTracking(hmd, 
+        ovrTrackingCap_Orientation |
+        ovrTrackingCap_Position 
+        , 0)) {
       SAY_ERR("Could not attach to sensor device");
     }
   }
 
   virtual ~RiftWrapperApp() {
-    ovrHmd_StopSensor(hmd);
   }
 
   RiftWrapperArgs getArgs() {
     RiftWrapperArgs result;
     result.hmd = hmd;
-    result.hmdDesc = hmdDesc;
     result.windowSize = Super::windowSize;
     return result;
   }
@@ -186,7 +184,7 @@ public:
     SDL_Window * result = SDL_CreateWindow("SDL",
         Super::windowPosition.x, Super::windowPosition.y,
         Super::windowSize.x, Super::windowSize.y,
-      SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN);
+        SDL_WINDOW_OPENGL |  SDL_WINDOW_BORDERLESS | SDL_WINDOW_SHOWN);
     return result;
   }
 };
@@ -195,7 +193,6 @@ public:
 class RiftApp {
 public:
   struct PerEyeArgs {
-    ovrGLTexture ovrTexture;
     //ovrEyeRenderDesc ovrEyeDesc;
     mat4 projection;
     oglplus::Texture      color_tex;
@@ -209,12 +206,12 @@ protected:
   uvec2       windowSize;
   ovrEyeType  currentEye{ ovrEye_Count };
   PerEyeArgs  eyesArgs[2];
-  ovrHmdDesc  hmdDesc;
   ovrHmd      hmd;
+  ovrTexture  ovrTextures[2];
 
 public:
   RiftApp(const RiftWrapperArgs & args) :
-      hmd(args.hmd), hmdDesc(args.hmdDesc), windowSize(args.windowSize)
+      hmd(args.hmd), windowSize(args.windowSize)
   {
     initGl();
   }
@@ -232,11 +229,12 @@ public:
       | ovrDistortionCap_TimeWarp
       ;
 
-    ovrFovPort * fovs = hmdDesc.DefaultEyeFov;
+    const ovrFovPort * fovs = hmd->DefaultEyeFov;
 
     ovrEyeRenderDesc eyeRenderDescs[2];
     int configResult = ovrHmd_ConfigureRendering(hmd, &cfg.Config,
       distortionCaps, fovs, eyeRenderDescs);
+    ovrHmd_SetEnabledCaps(hmd, ovrHmdCap_LowPersistence);
 
     float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
 
@@ -244,12 +242,12 @@ public:
       PerEyeArgs & eyeArgs = eyesArgs[eye];
       const ovrFovPort & fov = fovs[eye];
 
-      ovrGLTexture & ovrTexture = eyeArgs.ovrTexture;
+      ovrTexture & ovrTexture = ovrTextures[eye];
       memset(&ovrTexture, 0, sizeof(ovrGLTexture));
 
       eyeArgs.viewAdjust = glm::translate(glm::mat4(), Rift::fromOvr(eyeRenderDescs[eye].ViewAdjust));
 
-      ovrTextureHeader & eyeTextureHeader = ovrTexture.Texture.Header;
+      ovrTextureHeader & eyeTextureHeader = ovrTexture.Header;
       eyeTextureHeader.TextureSize = ovrHmd_GetFovTextureSize(hmd, eye, fov, 1.0f);
       eyeTextureHeader.RenderViewport.Size = eyeTextureHeader.TextureSize;
       eyeTextureHeader.API = ovrRenderAPI_OpenGL;
@@ -283,7 +281,7 @@ public:
         .AttachTexture(FramebufferAttachment::Color, eyeArgs.color_tex, 0)
         .AttachRenderbuffer(FramebufferAttachment::Depth, eyeArgs.depth_rbo)
         .Complete();
-      eyeArgs.ovrTexture.OGL.TexId = GetName(eyeArgs.color_tex);
+      ((ovrGLTexture&)ovrTexture).OGL.TexId = GetName(eyeArgs.color_tex);
     });
 
     ///////////////////////////////////////////////////////////////////////////
@@ -312,34 +310,33 @@ public:
     ovrHmd_BeginFrame(hmd, frameIndex++);
     MatrixStack & mv = Stacks::modelview();
     MatrixStack & pr = Stacks::projection();
+    static ovrPosef renderPoses[2];
     for (int i = 0; i < 2; ++i) {
-      ovrEyeType eye = currentEye = hmdDesc.EyeRenderOrder[i];
+      ovrEyeType eye = currentEye = hmd->EyeRenderOrder[i];
       PerEyeArgs & eyeArgs = eyesArgs[eye];
-
       pr.top() = eyeArgs.projection;
       Stacks::with_push(pr, mv, [&]{
         // Set up the per-eye projection matrix
-        ovrPosef renderPose = ovrHmd_BeginEyeRender(hmd, eye);
+        renderPoses[eye] = ovrHmd_GetEyePose(hmd, eye);
 
         // Apply the head pose
-        mv.preMultiply(glm::inverse(Rift::fromOvr(renderPose)));
+        mv.preMultiply(glm::inverse(Rift::fromOvr(renderPoses[eye])));
 
         // Apply the per-eye offset
         mv.preMultiply(eyeArgs.viewAdjust);
 
         //frameBuffers[eye].activate();
         eyeArgs.fbo.Bind(oglplus::Framebuffer::Target::Draw);
-        gl.Viewport(0, 0, eyeArgs.ovrTexture.Texture.Header.TextureSize.w,
-          eyeArgs.ovrTexture.Texture.Header.TextureSize.h);
+        gl.Viewport(0, 0, ovrTextures[eye].Header.TextureSize.w,
+          ovrTextures[eye].Header.TextureSize.h);
         // Render the scene to an offscreen buffer
         drawScene();
         oglplus::DefaultFramebuffer().Bind(oglplus::Framebuffer::Target::Draw);
-        ovrHmd_EndEyeRender(hmd, eye, renderPose, &(eyeArgs.ovrTexture.Texture));
       });
       GL_CHECK_ERROR;
     }
 
-    ovrHmd_EndFrame(hmd);
+    ovrHmd_EndFrame(hmd, renderPoses, ovrTextures);
     GL_CHECK_ERROR;
   }
 };

@@ -75,7 +75,13 @@ const std::string & getResourcePath(Resource resource) {
 }
 
 void Resources::getResourcePath(Resource resource, char * out, size_t size) {
-  const std::string & path = ::getResourcePath(resource);
+  std::string path = ::getResourcePath(resource);
+#ifdef FILE_LOADING
+  if (0 == path.find(Resources::RESOURCE_ROOT)) {
+    path = path.substr(Resources::RESOURCE_ROOT.size());
+  }
+#endif
+
 #ifdef WIN32
   strcpy_s(out, size, path.c_str());
 #else

@@ -164,9 +164,9 @@ void Gui::init(const uvec2 & size) {
   // AnimationManager::setDefaultResourceGroup("animations");
 
   SchemeManager::getSingleton().createFromFile("TaharezLook.scheme");
-  FontManager::getSingleton().createFromFile("DejaVuSans-14.font");
+  FontManager::getSingleton().createFromFile("Bitwise-24.font");
 
-  System::getSingleton().getDefaultGUIContext().setDefaultFont("DejaVuSans-14");
+  System::getSingleton().getDefaultGUIContext().setDefaultFont("Bitwise-24");
   System::getSingleton().getDefaultGUIContext().getMouseCursor().setDefaultImage("TaharezLook/MouseArrow");
 }
 

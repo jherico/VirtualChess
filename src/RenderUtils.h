@@ -19,6 +19,46 @@ public:
     NoProgram().Use();
   }
 
+  static void renderProceduralSkybox(Resource fragmentShader) {
+    using namespace oglplus;
+    Program & prog = GlUtils::getProgram(
+      Resource::SHADERS_CUBEMAP_VS, fragmentShader);
+
+    // Skybox texture
+    static Geometry cube(
+      [&](Buffer & vertexBuffer, Buffer & indexBuffer, VertexArray & vao){
+      GlUtils::getCubeVertices(vertexBuffer);
+      GlUtils::getCubeIndices(indexBuffer);
+      vao.Bind();
+      vertexBuffer.Bind(Buffer::Target::Array);
+      indexBuffer.Bind(Buffer::Target::ElementArray);
+      VertexArrayAttrib(Layout::Attribute::Position).
+        Pointer(3, DataType::Float, false, sizeof(vec4), nullptr).
+        Enable();
+      NoVertexArray().Bind();
+      NoBuffer().Bind(Buffer::Target::Array);
+      NoBuffer().Bind(Buffer::Target::ElementArray);
+    }, 36);
+
+    Context & gl = GlUtils::context();
+    gl.Disable(Capability::DepthTest);
+    gl.CullFace(Face::Front);
+
+    prog.Bind();
+    Uniform<float>(prog, Layout::Uniform::Time)
+      .Set(Platform::elapsedMillis() / 1000.0f);
+    MatrixStack & mv = Stacks::modelview();
+    mv.withPush([&]{
+      renderGeometry(prog, cube);
+    });
+
+    NoVertexArray().Bind();
+    NoProgram().Bind();
+    gl.CullFace(Face::Back);
+    gl.Enable(Capability::DepthTest);
+
+  }
+
   static void renderSkybox(Resource firstResource) {
     using namespace oglplus;
     static Program & prog = GlUtils::getProgram(
@@ -45,9 +85,11 @@ public:
     gl.Disable(Capability::DepthTest);
     gl.CullFace(Face::Front);
 
+    prog.Bind();
+    //Uniform<float>(prog, Layout::Uniform::Time)
+    //  .Set(Platform::elapsedMillis() / 1000.0f);
     MatrixStack & mv = Stacks::modelview();
     mv.withPush([&]{
-      mv.untranslate();
       auto boundTexture = gl.Bound(Texture::Target::CubeMap,
         GlUtils::getCubemapTexture(firstResource));
   //    Uniform<mat4>(prog, Layout::Uniform::Projection).Set(Stacks::projection().top());

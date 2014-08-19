@@ -114,35 +114,89 @@ void compileShaders(const Resource * shaders) {
   }
 }
 
+
+Resource SHADER_INCLUDES[] = {
+  SHADERS_NOISE_CELLULAR2_GLSL,
+  SHADERS_NOISE_CELLULAR2X2_GLSL,
+  SHADERS_NOISE_CELLULAR2X2X2_GLSL,
+  SHADERS_NOISE_CELLULAR3_GLSL,
+  SHADERS_NOISE_CNOISE2_GLSL,
+  SHADERS_NOISE_CNOISE3_GLSL,
+  SHADERS_NOISE_CNOISE4_GLSL,
+  SHADERS_NOISE_SNOISE2_GLSL,
+  SHADERS_NOISE_SNOISE3_GLSL,
+  SHADERS_NOISE_SNOISE4_GLSL,
+  SHADERS_NOISE_SRDNOISE2_GLSL,
+  NO_RESOURCE
+};
+
+typedef std::pair<Resource, Resource> ProgramId;
+typedef std::shared_ptr<Program> ProgramPtr;
+
+struct ProgramInfo {
+  time_t vsModified{ 0 };
+  time_t fsModified{ 0 };
+  ProgramPtr program;
+
+  void update(Resource vsRes, Resource fsRes) {
+    time_t vsModifiedNew = Platform::getResourceModified(vsRes);
+    time_t fsModifiedNew = Platform::getResourceModified(fsRes);
+    if (!program || vsModifiedNew < vsModified || fsModified < fsModifiedNew) {
+      vsModified = vsModifiedNew;
+      fsModified = fsModifiedNew;
+      VertexShader vs;
+      FragmentShader fs;
+      try {
+        vs.Source(Platform::getResourceString(vsRes)).Compile();
+        fs.Source(Platform::getResourceString(fsRes)).Compile();
+      } catch (const oglplus::CompileError & shaderError) {
+        const char * errorLog = shaderError.Log().c_str();
+        if (!program) {
+          FAIL("Shader compile error: %s", errorLog);
+        } else {
+          SAY("Shader compile error: %s", errorLog);
+          return;
+        }
+      }
+
+      program = ProgramPtr(new Program());
+      // attach the shaders to the program
+      program->AttachShader(vs);
+      program->AttachShader(fs);
+      // link and use it
+      program->Link();
+    }
+  }
+};
+
+
+typedef std::map<ProgramId, ProgramInfo> ProgramMap;
+typedef ProgramMap::iterator MapItr;
+
 Program & GlUtils::getProgram(Resource vsRes, Resource fsRes) {
   static bool shadersChecked = false;
   if (!shadersChecked) {
     shadersChecked = true;
+    for (int i = 0; SHADER_INCLUDES[i] != NO_RESOURCE; ++i) {
+      Resource shader = SHADER_INCLUDES[i];
+      std::string shaderPath = Platform::getResourcePath(shader);
+      std::string shaderSource = Platform::getResourceString(shader);
+
+      glNamedStringARB(GL_SHADER_INCLUDE_ARB,
+        shaderPath.length(), shaderPath.c_str(),
+        shaderSource.length(), shaderSource.c_str());
+    }
+
     //compileShaders<VertexShader>(Resources::VERTEX_SHADERS);
     //compileShaders<FragmentShader>(Resources::FRAGMENT_SHADERS);
   }
-  typedef std::pair<Resource, Resource> ProgramId;
-  typedef std::shared_ptr<Program> ProgramPtr;
-  typedef std::map<ProgramId, ProgramPtr> Map;
-  typedef Map::iterator MapItr;
-  static Map programs;
+  static ProgramMap programs;
   ProgramId key(vsRes, fsRes);
   if (0 == programs.count(key)) {
-    VertexShader vs;
-    vs.Source(Platform::getResourceString(vsRes)).Compile();
-    FragmentShader fs;
-    fs.Source(Platform::getResourceString(fsRes)).Compile();
-
-    ProgramPtr prog(new Program());
-    // attach the shaders to the program
-    prog->AttachShader(vs);
-    prog->AttachShader(fs);
-    // link and use it
-    prog->Link();
-    programs[key] = prog;
   }
-  return *(programs[key]);
-
+  ProgramInfo & programInfo = programs[key];
+  programInfo.update(vsRes, fsRes);
+  return *programInfo.program;
 }
 
 images::PNGImage getResourceImage(Resource res) {

@@ -127,6 +127,10 @@ std::string Platform::getResourceString(Resource resource) {
   return dataStr;
 }
 
+time_t Platform::getResourceModified(Resource resource) {
+  return Resources::getResourceModified(resource);
+}
+
 std::vector<uint8_t> Platform::getResourceVector(Resource resource) {
   size_t size = Resources::getResourceSize(resource);
   std::vector<uint8_t> result;
