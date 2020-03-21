@@ -4,10 +4,9 @@
 #set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
 #   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cxx_flag_overrides.cmake)
 
-project(VirtualChess)
+project(VirtualBase)
 cmake_minimum_required(VERSION 2.8)
 
-set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include (cotire)
 
@@ -25,19 +24,17 @@ foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
 endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
 
 # Comment out to disable the debug build
-set(CMAKE_BUILD_TYPE DEBUG)
-set(BUILD_SHARED_LIBS OFF)
+#set(CMAKE_BUILD_TYPE DEBUG)
 set(CMAKE_DEBUG_POSTFIX "d")
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(BUILD_SHARED_LIBS OFF)
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
-
 
 string( TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER )
 if(BUILD_TYPE_LOWER STREQUAL "debug")
 endif()
-
-# Verbosity is good, especially if a command fails
-set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     # Ensure we use C++ 11 
@@ -66,19 +63,19 @@ set_target_properties(glew PROPERTIES FOLDER "3rdparty")
 include_directories(${CMAKE_SOURCE_DIR}/libraries/glew/include)
 list(APPEND PROJECT_LIBS glew)
 
-include_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/include)
-link_directories(${CMAKE_SOURCE_DIR}/libraries/SDL2/lib/x86/)
-list(APPEND PROJECT_LIBS SDL2)
+find_package(SDL2)
+include_directories(${SDL2_INCLUDE_DIR})
+list(APPEND PROJECT_LIBS ${SDL2_LIBRARIES})
 
-if (WIN32)
-    set(Boost_USE_STATIC_LIBS    ON)
-endif()
-set(Boost_USE_MULTITHREADED  ON)
-set(Boost_USE_STATIC_RUNTIME ON)
-find_package(Boost COMPONENTS filesystem system thread)
-include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_LIBRARY_DIR})
-list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
+#if (WIN32)
+#    set(Boost_USE_STATIC_LIBS    ON)
+#endif()
+#set(Boost_USE_MULTITHREADED  ON)
+#set(Boost_USE_STATIC_RUNTIME ON)
+#find_package(Boost COMPONENTS filesystem system thread)
+#include_directories(${Boost_INCLUDE_DIR})
+#link_directories(${Boost_LIBRARY_DIR})
+#list(APPEND PROJECT_LIBS ${Boost_LIBRARIES})
 
 ###############################################################################
 #

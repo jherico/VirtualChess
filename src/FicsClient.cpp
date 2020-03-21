@@ -2,10 +2,8 @@
 #include "FicsClient.h"
 
 #include <exception>
-
-using namespace boost;
+#include <mutex>
 using namespace std;
-using boost::asio::ip::tcp;
 
 namespace Fics {
 
@@ -399,13 +397,13 @@ namespace Fics {
   struct Command {
     int code;
     string result;
-    boost::function<void(const std::string &)> handler;
-    boost::condition_variable condition;
-    boost::mutex mutex;
+    std::function<void(const std::string &)> handler;
+    //boost::condition_variable condition;
+    std::mutex mutex;
   };
 
   class ClientImpl : public SocketClient, public Client {
-    boost::asio::io_service io_service;
+    //boost::asio::io_service io_service;
     string readBuffer;
     string username, password;
     int commandId{10};
@@ -426,17 +424,24 @@ namespace Fics {
       close(); // close the telnet client connection
     }
 
-    void connect(tcp::resolver::iterator & endpoint_iterator, const std::string & username, const std::string & password) {
-      this->username = username;
-      this->password = password;
-      ::SocketClient::connect(endpoint_iterator);
+    void connect(const std::string & username, const std::string & password) {
+      //  this->username = username;
+      //  this->password = password;
+      //  ::SocketClient::connect(endpoint_iterator);
     }
+
 
     void command(const string & commandString) {
       write(Platform::format("%d %s\n", commandId++, commandString.c_str()));
     }
 
   protected:
+    //void connect(tcp::resolver::iterator & endpoint_iterator, const std::string & username, const std::string & password) {
+      //  this->username = username;
+      //  this->password = password;
+      //  ::SocketClient::connect(endpoint_iterator);
+    //}
+
     void onRead(ReadBuffer & buffer) {
       readBuffer.append(buffer.begin(), buffer.end());
       buffer.clear();
@@ -580,12 +585,12 @@ namespace Fics {
       }
     }
 
-    virtual void connect(const std::string & username, const std::string & password) {
-      tcp::resolver resolver(io_service);
-      tcp::resolver::query query("freechess.org", "5000");
-      tcp::resolver::iterator iterator = resolver.resolve(query);
-      connect(iterator, username, password);
-    }
+    //virtual void connect(const std::string & username, const std::string & password) {
+    //  tcp::resolver resolver(io_service);
+    //  tcp::resolver::query query("freechess.org", "5000");
+    //  tcp::resolver::iterator iterator = resolver.resolve(query);
+    //  connect(iterator, username, password);
+    //}
 
     virtual void listGames() {
       command("games");

@@ -38,25 +38,25 @@ static Geometry & getPieceGeometry(Chess::Piece piece) {
 }
 
 class TaskQueue {
-  boost::mutex m;
-  std::queue<boost::function<void()>> q;
+  std::mutex m;
+  std::queue<std::function<void()>> q;
 public:
 
   template <typename Function>
   void add(Function f) {
-    withScopedLock(m, [&](const boost::mutex::scoped_lock &){
-      q.push(f);
-    });
+    std::unique_lock<std::mutex> lock;
+    q.push(f);
   }
 
   void drain(long maxTimeMs = 0) {
     long start = Platform::elapsedMillis();
     while (!q.empty()) {
-      boost::function<void()> f;
-      withScopedLock(m, [&](const boost::mutex::scoped_lock &){
+      std::function<void()> f;
+      {
+        std::unique_lock<std::mutex> lock(m);
         f = q.front();
         q.pop();
-      });
+      }
       f();
       long now = Platform::elapsedMillis();
       if (maxTimeMs && ((now - start) > maxTimeMs)) {
@@ -133,7 +133,7 @@ public:
     ficsClient(Fics::Client::create())
   {
     // Set the callback for FICS events   
-    ficsClient->setEventHandler(boost::bind(&VirtualChess::onFicsEvent, this, _1));
+    //ficsClient->setEventHandler(boost::bind(&VirtualChess::onFicsEvent, this, _1));
 
     // Load the rocket UI
     {

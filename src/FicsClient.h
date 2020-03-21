@@ -115,7 +115,7 @@ namespace Fics {
   protected:
     Client() { }
     virtual ~Client() { }
-    boost::function<void(const Event&)> callback;
+    std::function<void(const Event&)> callback;
 
   public:
     static ClientPtr create();
@@ -123,7 +123,7 @@ namespace Fics {
     virtual void listGames() = 0;
     virtual void observeGame(int id) = 0;
     virtual void unobserveGame(int id) = 0;
-    virtual void setEventHandler(boost::function<void(const Event&)> callback) {
+    virtual void setEventHandler(std::function<void(const Event&)> callback) {
       this->callback = callback;
     }
   };

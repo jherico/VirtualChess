@@ -43,23 +43,12 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <stack>
 #include <sstream>
 #include <unordered_map>
 
-#include <boost/bind.hpp>
-#include <boost/asio.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/circular_buffer.hpp>
-
-
-template <typename Function>
-void withScopedLock(boost::mutex & mutex, Function f) {
-  boost::mutex::scoped_lock lock(mutex);
-  f(lock);
-}
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
